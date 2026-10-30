@@ -42,7 +42,7 @@
 #   BERNIE_LISTEN    listen address for --start (same as --listen)
 #   BERNIE_GO_DIR    where the build keeps Go and its caches
 #                    (default: ~/.local/share/bernie/go)
-#   BERNIE_GO_URL    Go download base URL (testing only; default https://go.dev/dl)
+#   BERNIE_GO_URL    Go download base URL (testing only; default https://dl.google.com/go)
 #
 # The script never calls `sudo` itself. If the chosen directory is not
 # writable, it prints the exact command and exits non-zero.
@@ -104,7 +104,7 @@ raw_base=${BERNIE_RAW_URL:-https://raw.githubusercontent.com/$repo}
 listen=${BERNIE_LISTEN:-127.0.0.1:7860}
 container_dir=${BERNIE_CONTAINER_DIR:-$HOME/.local/share/bernie/container}
 go_dir=${BERNIE_GO_DIR:-$HOME/.local/share/bernie/go}
-go_url=${BERNIE_GO_URL:-https://go.dev/dl}
+go_url=${BERNIE_GO_URL:-https://dl.google.com/go}
 dry_run=0
 start_after=0
 container=0
