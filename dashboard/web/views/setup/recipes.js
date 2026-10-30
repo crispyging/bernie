@@ -294,7 +294,15 @@ function setupPlanCommonOverrides() {
     placeholder: "/path/to/model or org/repo",
     onchange: () => setupApplyOverrides(),
   });
+  const kvOffload = h("input", {
+    type: "number", min: "1", step: "1",
+    name: "args.kv-offloading-size",
+    value: setupSetValue("args.kv-offloading-size", ""),
+    placeholder: "off",
+    onchange: () => setupApplyOverrides(),
+  });
   return h("div.recipe-common-overrides",
+    h("label.recipe-input", h("span.recipe-input-name", "KV offload to CPU (GB)"), kvOffload),
     h("label.recipe-input", h("span.recipe-input-name", "Port"), port),
     h("label.recipe-input", h("span.recipe-input-name", "Max context length"), ctx),
     h("label.recipe-input", h("span.recipe-input-name", "Run name"), name),
