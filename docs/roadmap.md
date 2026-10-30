@@ -13,8 +13,6 @@ Each item has a spec section and one test that proves it.
 
 | # | Item | Spec | Test |
 |---|---|---|---|
-| 1 | **Fit in recipe data.** A recipe lists `download_gb`, `vram_gib`, `ram_gib`, `kv_bytes_per_token`. `recipe list` shows `fits`, `tight: <reason>` or `no: <reason>`. | §7.2, §7.8 | `recipe list --json` on a fixture host: each recipe has `fit.verdict`; `fit.reasons` is non-empty unless `fits`. |
-| 2 | **Plan shrinks to fit.** `recipe plan` lowers `max-model-len` (32K, 16K, 8K) until the KV budget fits free VRAM. Each change is in `plan.adjustments[]` with a reason. A `--set` value is never changed. | §7 | `recipe plan --json` on a 16 GB fixture shows the adjustment; `--set args.max-model-len=8192` stays 8192. |
 | 4 | **Ready means answers.** A run is `ready` only after `/health` and a one-token completion succeed. | §3.1, §8.3 | A run with the model unloaded stays `starting` and says why. |
 | 5 | **Log doctor on failure.** When a run exits during startup, `serve` and `up` print the matched rule: id, cause, fix. | §5.3 | A fixture log with a known error prints that rule. |
 | 6 | **Next command in every state.** `status --json` has `next` for: no GPU, no recipe fits, recipe fits, run starting, run ready. | §3.1 | Fixture set covers the five states. |
@@ -30,6 +28,15 @@ Each item has a spec section and one test that proves it.
 
 ## Shipped
 
+- **Fit in recipe data.** A recipe may list `download_gb` and
+  `kv_bytes_per_token` beside `vram_gib` and `ram_gib`. The fit of `recipe
+  list` has a `verdict`: `fits`, `tight` or `no`, with reasons unless it
+  fits. Disk and the KV budget join the checks. Spec
+  [§7.8](spec.md#78-fit).
+- **Plan shrinks to fit.** `recipe plan` lowers `max-model-len` (128K, 64K,
+  32K, 16K, 8K) until the KV budget fits the selected GPUs. Each change is
+  in `plan.adjustments[]` with a reason. A `--set` value is never changed.
+  Spec [§7.8](spec.md#78-fit).
 - **Bench suites.** A suite is data: `bench/suites/*.yaml` holds the cells,
   the repetitions and the thresholds of a run. The loader is strict, and
   the digest of the suite pins the cells of a result. `bernie bench

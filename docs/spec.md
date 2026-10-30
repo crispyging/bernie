@@ -1015,6 +1015,8 @@ requires:
   vram_gib: 28                  # per GPU
   ram_gib: 64                   # host RAM
   engine: vllm-rdna             # vllm | vllm-rdna (needs the fork's kernels)
+  download_gb: 18               # optional; model files in GB (10^9 bytes)
+  kv_bytes_per_token: 196608    # optional; KV cache of one token over all ranks
 
 inputs:                         # values the operator gives with --set NAME=VALUE
   PLE_QUANT_DIR:
@@ -1111,8 +1113,65 @@ plan, `status`, `hw` and `doctor` all see the visible set only.
 
 ### 7.8 Fit
 
-`recipe list` gives each recipe a fit: `fits`, `no` (with reasons), or
-`unknown` (no GPU data). Reasons: arch, GPU count, VRAM, RAM.
+`recipe list` gives each recipe a fit:
+
+```json
+{"status": "fits", "verdict": "tight", "modes": ["host"],
+ "reasons": ["context: the KV cache holds about 16825 tokens; the plan lowers max-model-len from 32768 to 16384"]}
+```
+
+- `status` is `fits`, `no` or `unknown` (no GPU data). `up` and the best
+  recipe use it.
+- `verdict` is the same as `status`, except that a recipe that fits with a
+  cost is `tight`.
+- `reasons` is empty exactly when the verdict is `fits`. Reasons: arch, GPU
+  count, VRAM, RAM, disk, context.
+
+Rules:
+
+- **GPUs.** The host needs `requires.gpus` GPUs of a matching arch, each
+  with `requires.vram_gib`.
+- **RAM.** Host RAM must be at least `requires.ram_gib`.
+- **Disk.** The model needs `requires.download_gb` free in the file system
+  of the Hugging Face cache. More than 90% of the free space is `tight`;
+  more than all of it is `no`. A cached model, a local path and a model
+  from an input need no download.
+- **KV budget.** With `download_gb` and `kv_bytes_per_token` set, the KV
+  budget of one GPU is `VRAM x gpu-memory-utilization - weights_gb /
+  ranks - 2 GiB`. `weights_gb` is the part of the model in VRAM and
+  defaults to `download_gb`; a part that stays in host RAM, like the PLE
+  table of Flash-Next, does not count. VRAM is the smallest matching GPU.
+  Ranks is tensor x pipeline x data parallel size.
+  `gpu-memory-utilization` defaults to 0.9. The budget holds
+  `budget x ranks / kv_bytes_per_token` tokens.
+  - A recipe that sets `args.kv-cache-memory-bytes` fixes the KV cache of a
+    GPU. That size holds `size x ranks / kv_bytes_per_token` tokens, and
+    `gpu-memory-utilization` does not count. When `weights_gb / ranks +
+    size + 2 GiB` is more than the VRAM, the verdict is `no`.
+  - No budget left for the KV cache, or fewer than 8192 tokens: `no`.
+  - Fewer tokens than `args.max-model-len`: `tight`; the plan lowers it.
+  - A recipe without both fields skips the check.
+
+The plan applies the same budget to the GPUs it selected. When the budget
+holds fewer tokens than `args.max-model-len`, the plan lowers it to the
+largest of 131072, 65536, 32768, 16384 and 8192 that fits. Each change is
+one entry of `plan.adjustments`:
+
+```json
+{"setting": "args.max-model-len", "from": "32768", "to": "16384",
+ "reason": "the KV cache holds about 16825 tokens on 30 GiB GPUs; set args.max-model-len to keep a value"}
+```
+
+- A `max-model-len` from `--set` or the config is never changed.
+- A recipe without `max-model-len` is never changed.
+- When not even 8192 tokens fit, the plan keeps the value and adds a
+  warning.
+- `recipe plan` prints each adjustment. `up` and `serve` print it on the
+  progress log. `adjustments` is absent when nothing changed.
+
+Measure `kv_bytes_per_token` from the startup log of vLLM: `Available KV
+cache memory: X GiB` and `GPU KV cache size: N tokens` give `X GiB x ranks
+/ N`.
 
 ### 7.9 Setting reasons
 

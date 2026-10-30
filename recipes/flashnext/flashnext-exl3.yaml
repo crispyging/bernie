@@ -31,6 +31,12 @@ model:
   revision: 3.05bpw_h5_ng5
   served_name: flash-next-exl3
 
+requires:
+  # 85.1 GB of files; 32.6 GB of them is the n-gram table in host RAM.
+  download_gb: 85.1
+  weights_gb: 52.4
+  kv_bytes_per_token: null   # not measured for EXL3
+
 container: null
 
 env:

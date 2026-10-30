@@ -125,7 +125,8 @@ func Gather(ctx context.Context, o Options) (*Facts, error) {
 		return nil, gpuErr
 	}
 	set := recipe.Load()
-	f.Recipes = recipe.List(set, f.GPUs, f.Host.RAMBytes, true)
+	free, cached := setup.ModelStore(f.HFHome)
+	f.Recipes = recipe.List(set, f.GPUs, recipe.HostFacts{RAMBytes: f.Host.RAMBytes, DiskFreeBytes: free, Cached: cached}, true)
 	for _, e := range f.Recipes.Recipes {
 		if e.Fit.Status == recipe.FitYes {
 			f.Fits = append(f.Fits, e.ID)

@@ -30,6 +30,7 @@ model:
 requires:
   gpus: 4
   vram_gib: 28
+  download_gb: 13.5
 
 env:
   VLLM_USE_V2_MODEL_RUNNER: "1"
