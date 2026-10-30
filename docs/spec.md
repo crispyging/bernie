@@ -1159,7 +1159,9 @@ dashboard use this same plan document.
   than the package around it.
 - `serve` refuses a port that another process already listens on. The
   message names the run that holds the port, the command that stops it and
-  the flag that picks another port.
+  the flag that picks another port. When no run holds the port, the message
+  also names `bernie attach <port>`, which registers a vLLM server that
+  bernie did not start.
 - `HF_HUB_OFFLINE` and `TRANSFORMERS_OFFLINE` are `1` when `model.source`
   is a local path, and `0` when it is a Hugging Face repo id.
 - Host mode needs the fork built in the venv for `requires.engine: vllm-rdna`.

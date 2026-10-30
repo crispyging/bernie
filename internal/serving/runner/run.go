@@ -145,7 +145,7 @@ func checkPort(ctx context.Context, p *recipe.Plan) error {
 		return fmt.Errorf("port %d is already in use by the run %s; stop it first (bernie stop %s) or choose another port (--set args.port=%d)",
 			p.Port, name, name, p.Port+1)
 	}
-	return fmt.Errorf("port %d is already in use; stop the process that holds it or choose another port (--set args.port=%d)", p.Port, p.Port+1)
+	return fmt.Errorf("port %d is already in use; if it is a vLLM server, use it as it is (bernie attach %d), else stop the process that holds it or choose another port (--set args.port=%d)", p.Port, p.Port, p.Port+1)
 }
 
 // runOnPort returns the name of the run that listens on the port, or "".

@@ -3,6 +3,7 @@ package runner
 import (
 	"context"
 	"net"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -28,6 +29,9 @@ func TestCheckPortRefusesABusyPort(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "args.port=") {
 		t.Errorf("the error does not name the flag that picks another port: %v", err)
+	}
+	if !strings.Contains(err.Error(), "bernie attach "+strconv.Itoa(port)) {
+		t.Errorf("the error does not name the command that attaches the server: %v", err)
 	}
 }
 

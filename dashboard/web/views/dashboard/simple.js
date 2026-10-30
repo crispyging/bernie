@@ -278,7 +278,7 @@ function dashSimpleConnect(section) {
     if (key === painted) return;
     painted = key;
     if (!endpoint.base) {
-      put(text, "Start a model server to get an address and a ready-to-paste request.");
+      put(text, "Start a model server to get an address and a ready-to-paste request. Already running one? Use ", h("code", "bernie attach <port>"), ".");
       put(command, emptyState("No run is serving.", "A run is a model server on this host.", "bernie serve <recipe>"));
       return;
     }
