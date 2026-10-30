@@ -1,7 +1,12 @@
 #!/bin/sh
-# Install the latest bernie release binary and verify its checksum.
+# Install the latest bernie release binary and verify its checksum. When no
+# release exists, build bernie from source, with Go in a folder of this user.
 #
 #   curl -fsSL https://raw.githubusercontent.com/opengfx1030/bernie/main/scripts/install.sh | sh
+#
+# One command for the whole path (install, then `bernie up`):
+#
+#   curl -fsSL https://raw.githubusercontent.com/opengfx1030/bernie/main/scripts/install.sh | sh -s -- --up
 #
 # Flags:
 #   --version TAG    release tag, e.g. v0.1.0 (default: latest)
@@ -19,6 +24,11 @@
 #                    and the container up
 #   --container-dir DIR  where the container files go (default:
 #                    ~/.local/share/bernie/container)
+#   --up             run `bernie up` after the install: check, setup, serve,
+#                    dashboard. It stops at a step that needs root and prints
+#                    the command.
+#   --yes            with --up, do not ask for confirmation
+#   --from-source    build from source even when a release exists
 #   --dry-run        print what would be done, do nothing
 #   -h | --help      this help
 #
@@ -30,6 +40,9 @@
 #   BERNIE_RAW_URL   raw base URL (testing only; default
 #                    https://raw.githubusercontent.com/$repo)
 #   BERNIE_LISTEN    listen address for --start (same as --listen)
+#   BERNIE_GO_DIR    where the build keeps Go and its caches
+#                    (default: ~/.local/share/bernie/go)
+#   BERNIE_GO_URL    Go download base URL (testing only; default https://dl.google.com/go)
 #
 # The script never calls `sudo` itself. If the chosen directory is not
 # writable, it prints the exact command and exits non-zero.
@@ -41,9 +54,10 @@ set -eu
 
 usage() {
     cat <<'EOF'
-Usage: install.sh [--version TAG] [--dir DIR] [--start] [--listen ADDR] [--no-lan] [--container] [--container-dir DIR] [--dry-run] [-h|--help]
+Usage: install.sh [--version TAG] [--dir DIR] [--start] [--listen ADDR] [--no-lan] [--container] [--container-dir DIR] [--up] [--yes] [--from-source] [--dry-run] [-h|--help]
 
-Install the latest bernie release binary.
+Install the latest bernie release binary. When no release exists, build
+bernie from source, with Go in a folder of this user.
 
   --version TAG    release tag, e.g. v0.1.0 (default: latest)
   --dir DIR        install directory (default: ~/.local/bin)
@@ -54,6 +68,9 @@ Install the latest bernie release binary.
                    container up)
   --container-dir DIR  where the container files go
                    (default: ~/.local/share/bernie/container)
+  --up             run `bernie up` after the install
+  --yes            with --up, do not ask for confirmation
+  --from-source    build from source even when a release exists
   --dry-run        print what would be done; do nothing
 
 Environment:
@@ -63,6 +80,8 @@ Environment:
   BERNIE_BASE_URL  base URL                 (testing only)
   BERNIE_RAW_URL   raw base URL             (testing only)
   BERNIE_LISTEN    listen address           (overrides --listen)
+  BERNIE_GO_DIR    where the build keeps Go and its caches
+  BERNIE_GO_URL    Go download base URL     (testing only)
 
 After install, run:  bernie up
 
@@ -84,9 +103,14 @@ base_url=${BERNIE_BASE_URL:-https://github.com/$repo}
 raw_base=${BERNIE_RAW_URL:-https://raw.githubusercontent.com/$repo}
 listen=${BERNIE_LISTEN:-127.0.0.1:7860}
 container_dir=${BERNIE_CONTAINER_DIR:-$HOME/.local/share/bernie/container}
+go_dir=${BERNIE_GO_DIR:-$HOME/.local/share/bernie/go}
+go_url=${BERNIE_GO_URL:-https://dl.google.com/go}
 dry_run=0
 start_after=0
 container=0
+run_after=0
+assume_yes=0
+from_source=0
 
 while [ $# -gt 0 ]; do
     # A flag that takes a value and has none is an unknown flag.
@@ -102,6 +126,9 @@ while [ $# -gt 0 ]; do
         --no-lan)  listen=127.0.0.1:7860; shift ;;
         --container) container=1; shift ;;
         --container-dir) container_dir=$2; shift 2 ;;
+        --up)      run_after=1; shift ;;
+        --yes)     assume_yes=1; shift ;;
+        --from-source) from_source=1; shift ;;
         --dry-run) dry_run=1; shift ;;
         -h|--help) usage; exit 0 ;;
         *) printf 'bernie: unknown flag: %s\n\n' "$1" >&2
@@ -109,6 +136,12 @@ while [ $# -gt 0 ]; do
            exit 2 ;;
     esac
 done
+
+# `up` starts its own dashboard on the host.
+if [ "$run_after" = 1 ] && { [ "$start_after" = 1 ] || [ "$container" = 1 ]; }; then
+    printf 'bernie: --up starts the dashboard itself; do not combine it with --start or --container\n' >&2
+    exit 2
+fi
 
 # bernie ships as a Linux static binary; macOS and Windows are out of scope.
 case $(uname -s) in
@@ -238,10 +271,123 @@ EOF
     printf 'bernie: the container mounts the GPU device nodes and /sys (read-only); it does not mount the engine socket\n'
 }
 
+# --- the source path --------------------------------------------------------
+
+# go_at_least HAVE NEED: true when the dotted version HAVE is at least NEED.
+go_at_least() {
+    awk -v a="$1" -v b="$2" 'BEGIN {
+        n = split(a, x, "."); m = split(b, y, ".")
+        for (i = 1; i <= (n > m ? n : m); i++) {
+            if (x[i] + 0 > y[i] + 0) exit 0
+            if (x[i] + 0 < y[i] + 0) exit 1
+        }
+        exit 0
+    }'
+}
+
+# ensure_go GOMOD sets go_bin to a Go that can build the module: the one on
+# the PATH when it is new enough, else the toolchain of go.mod in a folder of
+# this user. The download is checked against the checksum go.dev publishes.
+ensure_go() {
+    need=$(sed -n 's/^go \([0-9.]*\).*/\1/p' "$1" | head -n 1)
+    if [ -z "$need" ]; then
+        printf 'bernie: go.mod names no Go version\n' >&2
+        exit 1
+    fi
+    if command -v go >/dev/null 2>&1; then
+        have=$(go env GOVERSION 2>/dev/null | sed 's/^go//')
+        if [ -n "$have" ] && go_at_least "$have" "$need"; then
+            go_bin=$(command -v go)
+            printf 'bernie: go        using %s (go%s)\n' "$go_bin" "$have"
+            return 0
+        fi
+    fi
+    want=$(sed -n 's/^toolchain \(go[0-9.]*\).*/\1/p' "$1" | head -n 1)
+    if [ -z "$want" ]; then
+        want=go$need
+        case $need in
+            *.*.*) ;;
+            *) want=$want.0 ;;
+        esac
+    fi
+    go_bin=$go_dir/$want/bin/go
+    if [ -x "$go_bin" ] && "$go_bin" version >/dev/null 2>&1; then
+        printf 'bernie: go        using %s\n' "$go_bin"
+        return 0
+    fi
+    file=$want.linux-$arch.tar.gz
+    printf 'bernie: go        downloading %s/%s to %s\n' "$go_url" "$file" "$go_dir"
+    if ! dl "$go_url/$file" "$work/$file" || ! dl "$go_url/$file.sha256" "$work/$file.sha256"; then
+        printf 'bernie: cannot download Go from %s\n' "$go_url" >&2
+        exit 1
+    fi
+    if [ "$(sha256sum "$work/$file" | cut -d' ' -f1)" != "$(tr -d ' \n' < "$work/$file.sha256")" ]; then
+        printf 'bernie: the checksum of %s does not match, aborting\n' "$file" >&2
+        exit 1
+    fi
+    mkdir -p "$go_dir/$want.tmp"
+    tar -xzf "$work/$file" -C "$go_dir/$want.tmp" --strip-components=1
+    rm -rf "${go_dir:?}/$want"
+    mv "$go_dir/$want.tmp" "$go_dir/$want"
+}
+
+# build_from_source builds the binary into $work/$asset. It needs no git and
+# no make: the source is the archive GitHub serves. The module cache and the
+# build cache stay next to Go, so a second run is quick.
+build_from_source() {
+    if [ "$version" = latest ]; then
+        label=main
+        src_url=$base_url/archive/refs/heads/main.tar.gz
+    else
+        label=$version
+        src_url=$base_url/archive/refs/tags/$version.tar.gz
+    fi
+    printf 'bernie: source    %s\n' "$src_url"
+    if ! dl "$src_url" "$work/src.tar.gz"; then
+        printf 'bernie: cannot download the source from %s\n' "$src_url" >&2
+        exit 1
+    fi
+    mkdir -p "$work/src" "$go_dir"
+    tar -xzf "$work/src.tar.gz" -C "$work/src" --strip-components=1
+    ensure_go "$work/src/go.mod"
+    module=$(sed -n 's/^module //p' "$work/src/go.mod")
+    stamp=src-$label-$(date -u +%Y%m%d%H%M)
+    printf 'bernie: build     %s (a minute or two the first time)\n' "$stamp"
+    if ! (cd "$work/src" && CGO_ENABLED=0 GOTOOLCHAIN=local GOFLAGS=-modcacherw \
+        GOPATH=$go_dir/gopath GOCACHE=$go_dir/cache \
+        "$go_bin" build -trimpath -ldflags "-s -w -X $module/internal/cli.Version=$stamp" \
+        -o "$work/$asset" ./cmd/bernie </dev/null); then
+        printf 'bernie: the build failed\n' >&2
+        exit 1
+    fi
+}
+
+# run_up runs the whole path after the install. A script piped into sh has no
+# keyboard on stdin, so the one question of `up` goes to the terminal.
+run_up() {
+    if [ "$assume_yes" = 1 ]; then
+        "$bin_dir/bernie" up --yes </dev/null
+    elif [ -t 0 ]; then
+        "$bin_dir/bernie" up
+    elif (exec </dev/tty) 2>/dev/null; then
+        "$bin_dir/bernie" up </dev/tty
+    else
+        printf 'bernie: no terminal to ask on; rerun with --up --yes, or run: bernie up\n' >&2
+        exit 1
+    fi
+}
+
 # Announce the plan. Always printed so the operator sees what will happen.
 printf 'bernie: target    %s @ %s (%s)\n' "$repo" "$version" "$arch"
 printf 'bernie: dest      %s/bernie\n' "$bin_dir"
-printf 'bernie: download  %s/%s\n' "$download_base" "$asset"
+if [ "$from_source" = 1 ]; then
+    printf 'bernie: download  none: build from source (Go in %s when needed)\n' "$go_dir"
+else
+    printf 'bernie: download  %s/%s\n' "$download_base" "$asset"
+fi
+if [ "$run_after" = 1 ]; then
+    printf 'bernie: then      bernie up\n'
+fi
 if [ "$start_after" = 1 ]; then
     printf 'bernie: dash      start (listen %s)\n' "$listen"
 fi
@@ -294,18 +440,28 @@ fi
 work=$(mktemp -d "${TMPDIR:-/tmp}/bernie-install.XXXXXX")
 trap 'rm -rf "$work"' EXIT INT TERM
 
-dl "$download_base/$asset" "$work/$asset"
-dl "$download_base/SHA256SUMS" "$work/SHA256SUMS"
-
-# Verify the checksum. The expected line is "<sha>  <filename>".
-if ! grep -q " $asset\$" "$work/SHA256SUMS"; then
-    printf 'bernie: %s not listed in SHA256SUMS\n' "$asset" >&2
+if [ "$from_source" = 1 ]; then
+    build_from_source
+elif dl "$download_base/$asset" "$work/$asset" 2>/dev/null &&
+    dl "$download_base/SHA256SUMS" "$work/SHA256SUMS" 2>/dev/null; then
+    # Verify the checksum. The expected line is "<sha>  <filename>". A mismatch
+    # stops here: it never falls back to the source.
+    if ! grep -q " $asset\$" "$work/SHA256SUMS"; then
+        printf 'bernie: %s not listed in SHA256SUMS\n' "$asset" >&2
+        exit 1
+    fi
+    (cd "$work" && grep " $asset\$" SHA256SUMS | sha256sum -c -) >/dev/null || {
+        printf 'bernie: checksum mismatch, aborting\n' >&2
+        exit 1
+    }
+elif [ "$version" = latest ]; then
+    printf 'bernie: no release to download; building from source (branch main)\n'
+    build_from_source
+else
+    printf 'bernie: cannot download release %s from %s\n' "$version" "$download_base" >&2
+    printf 'bernie: build that tag instead with --from-source\n' >&2
     exit 1
 fi
-(cd "$work" && grep " $asset\$" SHA256SUMS | sha256sum -c -) >/dev/null || {
-    printf 'bernie: checksum mismatch, aborting\n' >&2
-    exit 1
-}
 
 # Install. Use cp+chmod (POSIX) instead of GNU install(1) for portability.
 cp "$work/$asset" "$bin_dir/bernie"
@@ -346,6 +502,12 @@ if [ "$container" = 1 ]; then
             fi
         fi
     fi
+fi
+
+# The whole path, when asked.
+if [ "$run_after" = 1 ]; then
+    run_up
+    exit 0
 fi
 
 # Start the dashboard when asked. Re-running the line on the same version

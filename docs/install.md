@@ -17,6 +17,18 @@ recipe and the dashboard in one go) or `bernie doctor` for the checks alone.
 
 ## 1. Installer script
 
+One command for the whole path: install bernie, then run `bernie up`.
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/opengfx1030/bernie/main/scripts/install.sh | sh -s -- --up
+```
+
+`up` asks once, on your terminal. Add `--yes` to skip the question. `up` stops
+at a step that needs root, such as ROCm or a group, and prints the command. Run
+it, then run `bernie up` again.
+
+Without `--up`, the script only installs:
+
 ```bash
 curl -fsSL https://raw.githubusercontent.com/opengfx1030/bernie/main/scripts/install.sh | sh
 ```
@@ -29,6 +41,23 @@ The script:
 4. installs the file as `~/.local/bin/bernie`;
 5. prints the next command: `bernie up`.
 
+### When no release exists
+
+When the latest release cannot be downloaded, the script builds bernie from
+the `main` branch instead. It needs no git, no make and no root:
+
+1. it downloads the source archive of the branch;
+2. it uses the `go` on your `PATH` when it is new enough for `go.mod`;
+3. otherwise it downloads the toolchain that `go.mod` names from go.dev, checks
+   its SHA-256 sum, and keeps it in `~/.local/share/bernie/go`. It does not touch
+   a Go you already have;
+4. it builds and installs the binary.
+
+A build of `main` has no release checksum: you trust GitHub and the branch. A
+checksum mismatch of a release never falls back to the source, and neither does
+a `--version` tag that has no release. `--from-source` builds on purpose, also
+for a tag.
+
 It never calls `sudo` by itself. If the directory you choose is not writable
 by your user, the script says so and prints the exact command to run with
 `sudo`; you decide whether to run it.
@@ -39,6 +68,9 @@ by your user, the script says so and prints the exact command to run with
 |---|---|
 | `--version TAG` | Release tag, for example `v0.1.0`. Default: the latest release. |
 | `--dir DIR` | Install directory. Default: `~/.local/bin`. Use `--dir /usr/local/bin` for a system-wide install (needs `sudo`). |
+| `--up` | Run `bernie up` after the install. Does not combine with `--start` or `--container`. |
+| `--yes` | With `--up`, do not ask for confirmation. Without it and without a terminal, the script stops and says so. |
+| `--from-source` | Build from source even when a release exists. |
 | `--dry-run` | Print the plan (target, destination, download URL) and stop. Nothing is downloaded or written. |
 | `-h`, `--help` | Print the help. |
 
@@ -51,6 +83,7 @@ A flag wins over the variable of the same meaning.
 | `BERNIE_VERSION` | `latest` | Release tag, for example `v0.1.0`. |
 | `BERNIE_BIN_DIR` | `~/.local/bin` | Install directory. |
 | `BERNIE_REPO` | `opengfx1030/bernie` | GitHub `owner/repo`. |
+| `BERNIE_GO_DIR` | `~/.local/share/bernie/go` | Where a build keeps Go and its caches. |
 
 ### Examples
 
