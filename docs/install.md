@@ -211,6 +211,32 @@ Notes:
 - **Health check.** The image has no shell, so it has no `HEALTHCHECK`. Test
   from outside: `curl -H "Authorization: Bearer $TOKEN" http://127.0.0.1:7860/api/hw`.
 
+### Container without the installer
+
+This method runs no script and needs no `sudo`. Docker builds the image from
+the repository, so it also works before a release has an image to pull.
+
+```bash
+docker build -t bernie -f deploy/docker/Dockerfile https://github.com/opengfx1030/bernie.git
+docker run -d --name bernie-dash --restart unless-stopped \
+  -p 127.0.0.1:7860:7860 \
+  --device /dev/kfd --device /dev/dri \
+  --group-add "$(stat -c %g /dev/kfd)" --group-add "$(stat -c %g /dev/dri/renderD128)" \
+  --security-opt label=disable --security-opt seccomp=unconfined \
+  -v bernie-data:/data -v /sys:/sys:ro \
+  bernie
+docker logs bernie-dash
+```
+
+The log prints the URL to open. A new token is made at each start, unless you
+set `BERNIE_DASH_TOKEN`.
+
+The named volume `bernie-data` takes its owner from the image, so it needs no
+`chown`. To update, run the build again, run `docker rm -f bernie-dash`, then
+run `docker run` again. The volume keeps your data.
+
+The container has the limits of [What works in the image](#what-works-in-the-image).
+
 ### GPU access: classic or CDI
 
 A container gets the GPU in one of two ways.

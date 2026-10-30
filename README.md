@@ -69,6 +69,12 @@ the GPU group ids of the host, and starts the container on
 `/sys` (read-only); it does not mount the engine socket. See
 [SECURITY.md](SECURITY.md).
 
+No script? Docker can build the dashboard image from this repository, and you
+run it yourself. See
+[Container without the installer](docs/install.md#container-without-the-installer).
+The container runs the dashboard and the checks. To start vLLM, use the host
+binary.
+
 ### Step by step
 
 Prefer control? Each stage is its own command:
