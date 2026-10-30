@@ -150,6 +150,7 @@ func (a *applier) step(ctx context.Context, s Step, index, total int) error {
 			a.marker("$ " + c)
 			cmd := exec.CommandContext(ctx, "/bin/sh", "-c", c)
 			cmd.Stdout, cmd.Stderr = w, w
+			stopWholeGroup(cmd)
 			if err := cmd.Run(); err != nil {
 				exit = exitCodeOf(err)
 				return a.fail(i, start, fmt.Errorf("step %s: %q: %w", s.ID, c, err), exit)
