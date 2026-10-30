@@ -30,20 +30,16 @@ jobs:
         run: go test -race ./...
       - name: installer (fake release server)
         run: make installtest
-      - name: e2e one command, no Go on the PATH (temporary)
+      - name: e2e one command, too old a Go on the PATH (temporary)
         run: |
           h=$(mktemp -d)
-          # The real fork source, the real go.dev download, a piped script, no Go.
-          mkdir -p "$h/old"; printf '#!/bin/sh
-echo go1.20.1
-' > "$h/old/go"; chmod +x "$h/old/go"
+          mkdir -p "$h/old"
+          echo '#!/bin/sh' > "$h/old/go"
+          echo 'echo go1.20.1' >> "$h/old/go"
+          chmod +x "$h/old/go"
           cat scripts/install.sh | env -i HOME="$h" PATH="$h/old:/usr/bin:/bin" BERNIE_REPO=crispyging/bernie sh -s -- --up --yes || echo "install exit $?"
-          "$h/.local/share/bernie/go/"go*/bin/go version
-          ls -la "$h/.local/bin" "$h/.local/share/bernie/go"
+          "$h"/.local/share/bernie/go/go*/bin/go version
           "$h/.local/bin/bernie" version
-          "$h/.local/bin/bernie" --json recipe validate | head -c 300
-          echo
-          "$h/.local/bin/bernie" | head -20
       - name: shellcheck
         run: |
           sudo apt-get install -y --no-install-recommends shellcheck >/dev/null
