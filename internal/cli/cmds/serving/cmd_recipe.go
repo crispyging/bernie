@@ -131,8 +131,11 @@ func printRecipeList(w io.Writer, l recipe.Listing, all bool) {
 	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
 	fmt.Fprintln(tw, "ID\tSTATUS\tFIT\tGPUS\tMODES\tPRIO\tMODEL")
 	for _, e := range l.Recipes {
-		fit := e.Fit.Status
-		if e.Fit.Status == recipe.FitNo && len(e.Fit.Reasons) > 0 {
+		fit := e.Fit.Verdict
+		if fit == "" {
+			fit = e.Fit.Status
+		}
+		if fit != recipe.FitYes && fit != recipe.FitUnknown && len(e.Fit.Reasons) > 0 {
 			fit += " (" + strings.Join(e.Fit.Reasons, "; ") + ")"
 		}
 		fmt.Fprintf(tw, "%s\t%s\t%s\t%d x %s\t%s\t%d\t%s\n", e.ID, e.Status, fit, e.GPUs,
@@ -254,6 +257,9 @@ func printPlan(w io.Writer, p *recipe.Plan) {
 		}
 	}
 	fmt.Fprintf(w, "# url:       %s\n", runner.Record{Host: p.Host, Port: p.Port}.URL())
+	for _, a := range p.Adjustments {
+		fmt.Fprintf(w, "# adjusted:  %s %s -> %s (%s)\n", a.Setting, a.From, a.To, a.Reason)
+	}
 	for _, warn := range p.Warnings {
 		fmt.Fprintf(w, "# WARNING:   %s\n", warn)
 	}

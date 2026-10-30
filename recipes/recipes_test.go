@@ -64,21 +64,21 @@ func TestSingleGPURecipeFitsAndIsRecommended(t *testing.T) {
 	if v620.GFX != "gfx1030" || v620.VRAMBytes < 28<<30 {
 		t.Fatalf("fixture GPU 2 = %+v, want a V620 with at least 28 GiB", v620)
 	}
-	const ramBytes = 64 << 30
-	fit := recipe.CheckFit(r, []gpu.GPU{v620}, ramBytes)
+	host := recipe.HostFacts{RAMBytes: 64 << 30}
+	fit := recipe.CheckFit(r, []gpu.GPU{v620}, host)
 	if fit.Status != recipe.FitYes {
 		t.Fatalf("one-V620 fit = %s: %v", fit.Status, fit.Reasons)
 	}
-	noGPU := recipe.CheckFit(r, []gpu.GPU{}, ramBytes)
+	noGPU := recipe.CheckFit(r, []gpu.GPU{}, host)
 	if noGPU.Status != recipe.FitNo {
 		t.Fatalf("zero-GPU fit = %s: %v", noGPU.Status, noGPU.Reasons)
 	}
 
-	listing := recipe.List(s, []gpu.GPU{v620}, ramBytes, false)
+	listing := recipe.List(s, []gpu.GPU{v620}, host, false)
 	if got := recipe.Best(listing); got != id {
 		t.Fatalf("up recommendation = %q, want %q", got, id)
 	}
-	listing = recipe.List(s, []gpu.GPU{}, ramBytes, false)
+	listing = recipe.List(s, []gpu.GPU{}, host, false)
 	if got := recipe.Best(listing); got != "" {
 		t.Fatalf("up recommendation without a GPU = %q, want none", got)
 	}

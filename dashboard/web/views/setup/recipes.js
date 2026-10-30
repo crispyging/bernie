@@ -107,7 +107,7 @@ function setupFitLine(recipe) {
   if (status === "no") return "no: " + (reasons.join("; ") || "this recipe does not fit this host.");
   const need = (recipe.arch || []).join(", ") || "any architecture";
   const gpus = recipe.gpus ? recipe.gpus + " GPUs" : "any number of GPUs";
-  let line = "fits: " + need + ", " + gpus;
+  let line = (recipe.fit && recipe.fit.verdict === "tight" ? "tight: " : "fits: ") + need + ", " + gpus;
   if (reasons.length) line += " - " + reasons.join("; ");
   return line;
 }

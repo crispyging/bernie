@@ -34,6 +34,11 @@ type Requires struct {
 	VRAMGiB float64  `json:"vram_gib,omitempty"`
 	RAMGiB  float64  `json:"ram_gib,omitempty"`
 	Engine  string   `json:"engine,omitempty"`
+	// DownloadGB is the size of the model files in GB (10^9 bytes): the
+	// disk the download needs, and the weights the ranks share in VRAM.
+	DownloadGB float64 `json:"download_gb,omitempty"`
+	// KVBytesPerToken is the KV cache of one token over all ranks.
+	KVBytesPerToken float64 `json:"kv_bytes_per_token,omitempty"`
 }
 
 // Input is a named value the operator gives with --set NAME=VALUE.
