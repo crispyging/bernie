@@ -106,7 +106,7 @@ jobs:
       - name: image runs on a named volume
         if: steps.changed.outputs.run == 'true'
         run: |
-          docker build -t bernie -f deploy/docker/Dockerfile .
+          docker build -t bernie -f deploy/docker/Dockerfile https://github.com/crispyging/bernie.git#docker-run
           docker run -d --name bernie-dash -p 127.0.0.1:7860:7860 \
             -e BERNIE_DASH_TOKEN=ci -v bernie-data:/data -v /sys:/sys:ro bernie
           curl -fsS --retry 30 --retry-delay 1 --retry-all-errors -o /dev/null \
