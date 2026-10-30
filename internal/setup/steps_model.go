@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 )
 
 // modelDownload is the step that puts the model in the Hugging Face cache.
@@ -59,4 +60,22 @@ func modelCached(hub, repo string) bool {
 		}
 	}
 	return false
+}
+
+// ModelStore is the Hugging Face cache under hfHome as the recipe fit sees
+// it: the free bytes of its file system (0: unknown) and whether a repo is
+// already in it.
+func ModelStore(hfHome string) (free uint64, cached func(repo string) bool) {
+	hub := hubCache(hubHome(hfHome))
+	for dir := hub; ; dir = filepath.Dir(dir) {
+		var st syscall.Statfs_t
+		if syscall.Statfs(dir, &st) == nil {
+			free = uint64(st.Bavail) * uint64(st.Bsize)
+			break
+		}
+		if dir == filepath.Dir(dir) {
+			break
+		}
+	}
+	return free, func(repo string) bool { return modelCached(hub, repo) }
 }

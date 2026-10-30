@@ -59,6 +59,7 @@ model:
 requires:
   gpus: 4
   vram_gib: 28
+  download_gb: 21
 
 env:
   VLLM_RDNA2_W4A8_SDOT4: "1"

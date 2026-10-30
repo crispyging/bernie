@@ -36,6 +36,9 @@ func serveAndWait(ctx context.Context, o UpOptions, log io.Writer, res *UpResult
 		return err
 	}
 	if rec.Plan != nil {
+		for _, a := range rec.Plan.Adjustments {
+			fmt.Fprintf(log, "up: adjusted %s %s -> %s: %s\n", a.Setting, a.From, a.To, a.Reason)
+		}
 		for _, w := range rec.Plan.Warnings {
 			fmt.Fprintf(log, "up: warning: %s\n", w)
 		}
