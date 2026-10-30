@@ -76,7 +76,8 @@ func Validate(r *Recipe) []string {
 	if r.Container != nil && r.Container.DeviceAccess != "" && !contains(host.DeviceAccessModes, r.Container.DeviceAccess) {
 		add("container.device_access: want one of %s, got %q", strings.Join(host.DeviceAccessModes, ", "), r.Container.DeviceAccess)
 	}
-	if r.Requires.GPUs < 0 || r.Requires.VRAMGiB < 0 || r.Requires.RAMGiB < 0 {
+	if r.Requires.GPUs < 0 || r.Requires.VRAMGiB < 0 || r.Requires.RAMGiB < 0 ||
+		r.Requires.DownloadGB < 0 || r.Requires.KVBytesPerToken < 0 {
 		add("requires: values must not be negative")
 	}
 	for _, name := range sortedKeys(r.Inputs) {

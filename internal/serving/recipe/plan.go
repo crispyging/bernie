@@ -66,10 +66,13 @@ type Plan struct {
 	// Args follow "serve": the model, then flags sorted by name.
 	Args []string `json:"args"`
 	// Settings holds the settings with a recipe-provided reason.
-	Settings        []Setting `json:"settings,omitempty"`
-	GPUs            []int     `json:"gpus"`
-	HIPDevices      string    `json:"hip_devices"`
-	GPUSelectReason string    `json:"gpu_select_reason"`
+	Settings []Setting `json:"settings,omitempty"`
+	// Adjustments are the settings the plan changed to fit the host
+	// (spec §7.8). A --set value is never changed.
+	Adjustments     []Adjustment `json:"adjustments,omitempty"`
+	GPUs            []int        `json:"gpus"`
+	HIPDevices      string       `json:"hip_devices"`
+	GPUSelectReason string       `json:"gpu_select_reason"`
 	// Restriction says that the environment limits the GPUs bernie uses
 	// (spec §7.7). It is empty when nothing is restricted.
 	Restriction string `json:"restriction,omitempty"`
@@ -181,6 +184,9 @@ func BuildPlan(r *Recipe, o PlanOptions) (*Plan, error) {
 	planPaths(r, p, vals, local)
 	planContainer(r, p)
 	if err := selectGPUs(r, p, o); err != nil {
+		return nil, err
+	}
+	if err := shrinkContext(r, p, o, interp); err != nil {
 		return nil, err
 	}
 	if mode == ModeHost {

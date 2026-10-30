@@ -2,6 +2,7 @@ package recipe
 
 import (
 	"fmt"
+	"path/filepath"
 	"sort"
 	"strings"
 
@@ -13,54 +14,114 @@ const (
 	FitYes     = "fits"
 	FitNo      = "no"
 	FitUnknown = "unknown"
+	// FitTight is a verdict only: the recipe fits, with a cost the reasons
+	// name (a shorter context, a nearly full disk).
+	FitTight = "tight"
 )
 
-// Fit is how a recipe fits this host (spec §7.8). Modes are the modes the
-// recipe supports (host always; container when it names an image).
+// Fit is how a recipe fits this host (spec §7.8). Status is fits, no or
+// unknown. Verdict is the same, except that a recipe that fits with a cost
+// is tight. Modes are the modes the recipe supports (host always;
+// container when it names an image).
 type Fit struct {
 	Status  string   `json:"status"`
+	Verdict string   `json:"verdict"`
 	Reasons []string `json:"reasons"`
 	Modes   []string `json:"modes"`
 }
 
+// HostFacts is what the fit reads about the host besides its GPUs. A zero
+// field skips its check. Cached reports a model already in the Hugging
+// Face cache; nil means none is.
+type HostFacts struct {
+	RAMBytes      uint64
+	DiskFreeBytes uint64
+	Cached        func(source string) bool
+}
+
+// diskSlack is the share of free disk a download may fill before the fit
+// says tight.
+const diskSlack = 0.9
+
 // CheckFit compares the recipe's requires block with the host. gpus == nil
-// means no GPU data (unknown). ramBytes == 0 skips the RAM check.
-func CheckFit(r *Recipe, gpus []gpu.GPU, ramBytes uint64) Fit {
+// means no GPU data (unknown).
+func CheckFit(r *Recipe, gpus []gpu.GPU, h HostFacts) Fit {
 	f := Fit{Status: FitYes, Reasons: []string{}, Modes: Modes(r)}
 	rq := r.Requires
+	var tight []string
 	if gpus == nil {
 		f.Status = FitUnknown
 		f.Reasons = append(f.Reasons, "no GPU data")
 	} else {
-		var match, vramOK int
-		for _, g := range gpus {
-			if !gpu.ArchMatch(rq.Arch, g.GFX) {
-				continue
-			}
-			match++
-			if rq.VRAMGiB <= 0 || float64(g.VRAMBytes) >= rq.VRAMGiB*gib {
-				vramOK++
-			}
-		}
-		switch {
-		case match == 0:
-			f.Reasons = append(f.Reasons, fmt.Sprintf("arch: needs %s; host has %s", strings.Join(rq.Arch, "/"), archSummary(gpus)))
-		case match < rq.GPUs:
-			f.Reasons = append(f.Reasons, fmt.Sprintf("gpus: needs %d %s GPUs; host has %d", rq.GPUs, strings.Join(rq.Arch, "/"), match))
-		case vramOK < rq.GPUs:
-			f.Reasons = append(f.Reasons, fmt.Sprintf("vram: needs %g GiB per GPU; %d of %d matching GPUs have it", rq.VRAMGiB, vramOK, match))
+		f.Reasons = append(f.Reasons, gpuReasons(rq, gpus)...)
+		if len(f.Reasons) == 0 {
+			vram := minVRAM(gpus, func(g gpu.GPU) bool { return gpu.ArchMatch(rq.Arch, g.GFX) })
+			t, no := contextReasons(r, vram)
+			tight = append(tight, t...)
+			f.Reasons = append(f.Reasons, no...)
 		}
 	}
-	if rq.RAMGiB > 0 && ramBytes > 0 && float64(ramBytes) < rq.RAMGiB*gib {
-		f.Reasons = append(f.Reasons, fmt.Sprintf("ram: needs %g GiB host RAM; host has %.0f GiB", rq.RAMGiB, float64(ramBytes)/gib))
+	if rq.RAMGiB > 0 && h.RAMBytes > 0 && float64(h.RAMBytes) < rq.RAMGiB*gib {
+		f.Reasons = append(f.Reasons, fmt.Sprintf("ram: needs %g GiB host RAM; host has %.0f GiB", rq.RAMGiB, float64(h.RAMBytes)/gib))
 	}
+	t, no := diskReasons(r, h)
+	tight = append(tight, t...)
+	f.Reasons = append(f.Reasons, no...)
 	if len(f.Reasons) > 0 && f.Status == FitYes {
 		f.Status = FitNo
 	}
 	if f.Status == FitUnknown && len(f.Reasons) > 1 {
-		f.Status = FitNo // RAM alone already rules it out
+		f.Status = FitNo // RAM or disk alone already rules it out
+	}
+	f.Verdict = f.Status
+	if f.Status == FitYes && len(tight) > 0 {
+		f.Verdict = FitTight
+		f.Reasons = tight
 	}
 	return f
+}
+
+// gpuReasons are the reasons the GPUs rule the recipe out: arch, count,
+// VRAM per GPU.
+func gpuReasons(rq Requires, gpus []gpu.GPU) []string {
+	var match, vramOK int
+	for _, g := range gpus {
+		if !gpu.ArchMatch(rq.Arch, g.GFX) {
+			continue
+		}
+		match++
+		if rq.VRAMGiB <= 0 || float64(g.VRAMBytes) >= rq.VRAMGiB*gib {
+			vramOK++
+		}
+	}
+	switch {
+	case match == 0:
+		return []string{fmt.Sprintf("arch: needs %s; host has %s", strings.Join(rq.Arch, "/"), archSummary(gpus))}
+	case match < rq.GPUs:
+		return []string{fmt.Sprintf("gpus: needs %d %s GPUs; host has %d", rq.GPUs, strings.Join(rq.Arch, "/"), match)}
+	case vramOK < rq.GPUs:
+		return []string{fmt.Sprintf("vram: needs %g GiB per GPU; %d of %d matching GPUs have it", rq.VRAMGiB, vramOK, match)}
+	}
+	return nil
+}
+
+// diskReasons compare download_gb with the free disk of the Hugging Face
+// cache. A local model, a model from an input and a cached model need no
+// download.
+func diskReasons(r *Recipe, h HostFacts) (tight, no []string) {
+	src := r.Model.Source
+	if r.Requires.DownloadGB <= 0 || h.DiskFreeBytes == 0 || src == "" ||
+		filepath.IsAbs(src) || strings.Contains(src, "${") || (h.Cached != nil && h.Cached(src)) {
+		return nil, nil
+	}
+	need, free := r.Requires.DownloadGB*1e9, float64(h.DiskFreeBytes)
+	switch {
+	case need > free:
+		return nil, []string{fmt.Sprintf("disk: the model needs %g GB; the Hugging Face cache has %.0f GB free", r.Requires.DownloadGB, free/1e9)}
+	case need > free*diskSlack:
+		return []string{fmt.Sprintf("disk: the model needs %g GB of the %.0f GB free in the Hugging Face cache", r.Requires.DownloadGB, free/1e9)}, nil
+	}
+	return nil, nil
 }
 
 // ListEntry is one row of `recipe list` (and the dashboard's /api/recipes).
@@ -93,7 +154,7 @@ type Listing struct {
 // List resolves every launchable recipe of s and checks its fit. Without
 // all, recipes that do not fit are left out (unknown fit is kept). Resolve
 // errors join the load errors. Entries are sorted by id.
-func List(s Set, gpus []gpu.GPU, ramBytes uint64, all bool) Listing {
+func List(s Set, gpus []gpu.GPU, h HostFacts, all bool) Listing {
 	l := Listing{Recipes: []ListEntry{}, Errors: append([]LoadError{}, s.Errors...)}
 	for _, id := range s.IDs(false) {
 		r, err := s.Resolve(id)
@@ -106,7 +167,7 @@ func List(s Set, gpus []gpu.GPU, ramBytes uint64, all bool) Listing {
 			l.Errors = append(l.Errors, LoadError{Source: s.Recipes[id].Source, Err: err.Error()})
 			continue
 		}
-		fit := CheckFit(r, gpus, ramBytes)
+		fit := CheckFit(r, gpus, h)
 		if !all && fit.Status == FitNo {
 			continue
 		}
