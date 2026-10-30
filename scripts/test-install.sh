@@ -247,7 +247,7 @@ echo "test 7: --no-lan forces loopback only"
 t=$(setup)
 build_release "$t/release"
 read -r server_pid server_port < <(start_server "$t/release")
-run_install "$t" "http://127.0.0.1:$server_port" "$t/bin" "--dry-run --no-lan"
+run_install "$t" "http://127.0.0.1:$server_port" "$t/bin" "--dry-run --start --no-lan"
 rc=$(cat "$t/rc"); out=$(cat "$t/out")
 stop_server "$server_pid"
 assert_equals "dry-run --no-lan exit code" "$rc" "0"

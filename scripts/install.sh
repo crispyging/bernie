@@ -89,6 +89,11 @@ start_after=0
 container=0
 
 while [ $# -gt 0 ]; do
+    # A flag that takes a value and has none is an unknown flag.
+    case "$1" in
+        --version|--dir|--listen|--container-dir)
+            [ $# -ge 2 ] || set -- "$1=<missing value>" ;;
+    esac
     case "$1" in
         --version) version=$2; shift 2 ;;
         --dir)     bin_dir=$2; shift 2 ;;
