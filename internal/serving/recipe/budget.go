@@ -22,9 +22,11 @@ const DefaultMemoryUtilization = 0.9
 var contextSteps = []int{131072, 65536, 32768, 16384, MinContext}
 
 // kvTokens estimates how many tokens of KV cache fit on GPUs of vramBytes
-// each (spec §7.8). The weights (download_gb) are split over the ranks; the
-// KV cache of a token is too. ok is false when the recipe lacks the data.
-// weightsFit is false when the weights alone fill the budget.
+// each (spec §7.8). The weights (weights_gb, or download_gb) are split over
+// the ranks; the KV cache of a token is too. A recipe that sets
+// kv-cache-memory-bytes fixes the KV cache of a GPU, so that size counts and
+// gpu-memory-utilization does not. ok is false when the recipe lacks the data.
+// weightsFit is false when the weights and the KV cache do not fit.
 func kvTokens(rq Requires, args map[string]any, vramBytes uint64) (tokens int, weightsFit, ok bool) {
 	if rq.DownloadGB <= 0 || rq.KVBytesPerToken <= 0 || vramBytes == 0 {
 		return 0, false, false
@@ -33,11 +35,22 @@ func kvTokens(rq Requires, args map[string]any, vramBytes uint64) (tokens int, w
 	if !set || world < 1 {
 		world = 1
 	}
+	weights := rq.WeightsGB
+	if weights <= 0 {
+		weights = rq.DownloadGB
+	}
+	room := float64(vramBytes) - weights*1e9/float64(world) - KVReserve
+	if kv, found := toFloat(args["kv-cache-memory-bytes"]); found && kv > 0 {
+		if room < kv {
+			return 0, false, true
+		}
+		return int(kv * float64(world) / rq.KVBytesPerToken), true, true
+	}
 	util := DefaultMemoryUtilization
 	if v, found := toFloat(args["gpu-memory-utilization"]); found && v > 0 && v <= 1 {
 		util = v
 	}
-	budget := float64(vramBytes)*util - rq.DownloadGB*1e9/float64(world) - KVReserve
+	budget := float64(vramBytes)*util - weights*1e9/float64(world) - KVReserve
 	if budget <= 0 {
 		return 0, false, true
 	}
@@ -86,7 +99,11 @@ func contextReasons(r *Recipe, vramBytes uint64) (tight, no []string) {
 	vram := float64(vramBytes) / gib
 	switch {
 	case !weightsFit:
-		return nil, []string{fmt.Sprintf("vram: %g GB of weights leave no KV cache on %.0f GiB GPUs", r.Requires.DownloadGB, vram)}
+		weights := r.Requires.WeightsGB
+		if weights <= 0 {
+			weights = r.Requires.DownloadGB
+		}
+		return nil, []string{fmt.Sprintf("vram: %g GB of weights leave no KV cache on %.0f GiB GPUs", weights, vram)}
 	case tokens < MinContext:
 		return nil, []string{fmt.Sprintf("vram: the KV cache holds about %d tokens on %.0f GiB GPUs; the floor is %d", tokens, vram, MinContext)}
 	}

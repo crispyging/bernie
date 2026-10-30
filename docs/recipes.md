@@ -67,6 +67,7 @@ requires:
   ram_gib: 48                   # host RAM
   engine: vllm-rdna             # vllm | vllm-rdna (needs the fork's kernels)
   download_gb: 18               # optional. Model files in GB; checked against free disk.
+  weights_gb: 18                # optional. The part in VRAM, over all GPUs. Defaults to download_gb.
   kv_bytes_per_token: 196608    # optional. With download_gb, the plan lowers max-model-len to fit (spec §7.8).
 
 inputs:                         # values the operator gives with --set NAME=VALUE

@@ -27,6 +27,11 @@ model:
 requires:
   gpus: 4
   vram_gib: 28
+  # 180.8 GB of files; 102.5 GB of them is the PLE table, which stays in host RAM.
+  download_gb: 180.8
+  weights_gb: 78.3
+  # Measured on 4x V620: 4026531840 bytes per GPU hold 266945 tokens.
+  kv_bytes_per_token: 60336
 
 env:
   VLLM_USE_V2_MODEL_RUNNER: "1"

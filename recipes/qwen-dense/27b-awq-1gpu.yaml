@@ -47,6 +47,7 @@ requires:
   arch: [gfx1030]
   gpus: 1
   vram_gib: 28
+  download_gb: 21
   ram_gib: 32
 
 env:

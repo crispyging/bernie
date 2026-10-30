@@ -35,8 +35,12 @@ type Requires struct {
 	RAMGiB  float64  `json:"ram_gib,omitempty"`
 	Engine  string   `json:"engine,omitempty"`
 	// DownloadGB is the size of the model files in GB (10^9 bytes): the
-	// disk the download needs, and the weights the ranks share in VRAM.
+	// disk the download needs.
 	DownloadGB float64 `json:"download_gb,omitempty"`
+	// WeightsGB is the part of the model the ranks share in VRAM, in GB. It
+	// defaults to DownloadGB. It is smaller when a part of the files stays
+	// in host RAM, like the PLE table of Flash-Next.
+	WeightsGB float64 `json:"weights_gb,omitempty"`
 	// KVBytesPerToken is the KV cache of one token over all ranks.
 	KVBytesPerToken float64 `json:"kv_bytes_per_token,omitempty"`
 }

@@ -23,6 +23,43 @@ args: {max-model-len: 32768, tensor-parallel-size: 1}
 	return r
 }
 
+// A recipe that sets kv-cache-memory-bytes fixes the KV cache: that size holds
+// the tokens, and it must fit beside the weights.
+func TestExplicitKVCacheSize(t *testing.T) {
+	gpus, _ := par1(t)
+	tests := []struct {
+		name    string
+		kv      string
+		verdict string
+		reason  string
+	}{
+		{"holds the context", "8589934592", FitYes, ""},
+		{"too small for the context", "4294967296", FitTight, "lowers max-model-len from 32768 to 16384"},
+		{"does not fit beside the weights", "12884901888", FitNo, "leave no KV cache"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r, err := Parse("t/budget.yaml", []byte(`schema: 1
+name: Budget
+status: experimental
+model: {source: org/model}
+requires: {arch: [gfx1030], gpus: 1, download_gb: 18, kv_bytes_per_token: 262144}
+args: {max-model-len: 32768, tensor-parallel-size: 1, kv-cache-memory-bytes: `+tt.kv+`}
+`))
+			if err != nil {
+				t.Fatal(err)
+			}
+			f := CheckFit(r, gpus, HostFacts{})
+			if f.Verdict != tt.verdict {
+				t.Fatalf("verdict %s (%v), want %s", f.Verdict, f.Reasons, tt.verdict)
+			}
+			if tt.reason != "" && !strings.Contains(strings.Join(f.Reasons, "; "), tt.reason) {
+				t.Errorf("reasons %v lack %q", f.Reasons, tt.reason)
+			}
+		})
+	}
+}
+
 func TestCheckFitVerdict(t *testing.T) {
 	gpus, _ := par1(t)
 	cachedRepo := func(string) bool { return true }
@@ -39,6 +76,7 @@ func TestCheckFitVerdict(t *testing.T) {
 		{"context shrinks", "download_gb: 18, kv_bytes_per_token: 524288", HostFacts{}, FitYes, FitTight, "lowers max-model-len from 32768 to 16384"},
 		{"weights fill the card", "download_gb: 30, kv_bytes_per_token: 262144", HostFacts{}, FitNo, FitNo, "leave no KV cache"},
 		{"below the floor", "download_gb: 18, kv_bytes_per_token: 2097152", HostFacts{}, FitNo, FitNo, "the floor is 8192"},
+		{"weights in VRAM are less than the download", "download_gb: 180, weights_gb: 18, kv_bytes_per_token: 262144", HostFacts{}, FitYes, FitYes, ""},
 		{"disk too small", "download_gb: 18", HostFacts{DiskFreeBytes: 10e9}, FitNo, FitNo, "disk: the model needs 18 GB"},
 		{"disk nearly full", "download_gb: 18", HostFacts{DiskFreeBytes: 19e9}, FitYes, FitTight, "disk: the model needs 18 GB of the 19 GB free"},
 		{"cached model needs no disk", "download_gb: 18", HostFacts{DiskFreeBytes: 10e9, Cached: cachedRepo}, FitYes, FitYes, ""},

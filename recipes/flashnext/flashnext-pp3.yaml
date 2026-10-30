@@ -32,6 +32,10 @@ tags: [qwen, flash-next, moe, awq, pipeline-parallel]
 
 requires:
   gpus: 3
+  # Not measured with pipeline parallel: the per-rank split of the weights
+  # is not even, so the fit skips the KV budget.
+  weights_gb: null
+  kv_bytes_per_token: null
 
 container: null
 

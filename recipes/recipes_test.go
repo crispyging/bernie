@@ -133,6 +133,14 @@ func TestBuiltinsLoadResolveValidatePlan(t *testing.T) {
 			if len(p.GPUs) != r.Requires.GPUs {
 				t.Errorf("plan %s: selected %v, want %d GPUs", id, p.GPUs, r.Requires.GPUs)
 			}
+			// The reference host runs these recipes: the size data of a
+			// recipe must not shrink or reject a profile that works there.
+			if len(p.Adjustments) != 0 {
+				t.Errorf("plan %s: adjustments %+v on the reference host", id, p.Adjustments)
+			}
+			if f := recipe.CheckFit(r, gpus, recipe.HostFacts{}); f.Verdict != recipe.FitYes {
+				t.Errorf("fit %s: %s %v on the reference host", id, f.Verdict, f.Reasons)
+			}
 			for _, i := range p.GPUs {
 				if gpus[i].GFX != "gfx1030" {
 					t.Errorf("plan %s: selected GPU %d is %s", id, i, gpus[i].GFX)
