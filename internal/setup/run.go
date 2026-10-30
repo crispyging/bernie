@@ -236,21 +236,23 @@ func (s *RunStore) Prune(keep int) {
 	if keep < 1 {
 		return
 	}
-	entries, err := os.ReadDir(s.Root)
+	runs, err := s.List()
 	if err != nil {
 		return
 	}
-	var dirs []string
-	for _, e := range entries {
-		if e.IsDir() {
-			dirs = append(dirs, e.Name())
-		}
+	// List is newest first by start time. Two runs of one second differ
+	// only in their random suffix, so the name does not order them.
+	latest := ""
+	if b, err := os.ReadFile(filepath.Join(s.Root, "latest")); err == nil {
+		latest = strings.TrimSpace(string(b))
 	}
-	// The ids start with the time of the run, so the name sorts by time.
-	sort.Strings(dirs)
-	for len(dirs) > keep {
-		os.RemoveAll(s.Dir(dirs[0]))
-		dirs = dirs[1:]
+	kept := 0
+	for _, r := range runs {
+		if kept < keep || r.ID == latest {
+			kept++
+			continue
+		}
+		os.RemoveAll(s.Dir(r.ID))
 	}
 }
 
