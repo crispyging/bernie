@@ -25,7 +25,17 @@ flowchart LR
 
 ## Quick start
 
-It is one file. Put it on the GPU host (Linux) and run it.
+One command on the GPU host (Linux). It installs bernie, then runs `bernie up`:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/opengfx1030/bernie/main/scripts/install.sh | sh -s -- --up
+```
+
+It asks once before it changes anything, and it needs no root. When no release
+exists it builds bernie from source, and it fetches Go if yours is missing or too
+old. It stops at a step that needs root and prints the command to run.
+
+To start only the dashboard:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/opengfx1030/bernie/main/scripts/install.sh | sh -s -- --start

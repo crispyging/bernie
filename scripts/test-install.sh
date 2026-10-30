@@ -12,6 +12,7 @@
 #   3. checksum mismatch is rejected (the binary is not installed)
 #   4. unknown flag exits non-zero
 #   5. unwritable --dir prints the sudo command and exits non-zero
+#   12-18. no release: Go and the source path, --up
 #
 # python3 is the only requirement. The script needs it on PATH.
 
@@ -302,6 +303,175 @@ set -e
 rc=$(cat "$t/rc"); out=$(cat "$t/out")
 assert_equals "--container-dir missing value exit code" "$rc" "2"
 assert_contains "--container-dir missing value message" "$out" "unknown flag: --container-dir"
+teardown "$t"
+
+# --- the source path: no release, and Go to fetch ---------------------------
+
+# build_source_tree serves what a build needs under $1: the source archive,
+# and a fake Go whose `build` writes a fake bernie. The fake bernie records
+# its arguments in $UP_LOG. $2 is the version the fake Go says it is.
+build_source_tree() {
+    local dir="$1" gover="$2" tmp
+    tmp=$(mktemp -d "${TMPDIR:-/tmp}/bernie-src.XXXXXX")
+    mkdir -p "$tmp/bernie-main/cmd/bernie" "$dir/archive/refs/heads" "$dir/go"
+    printf 'module example.com/bernie\n\ngo 1.26\n\ntoolchain go1.26.10\n' >"$tmp/bernie-main/go.mod"
+    tar -czf "$dir/archive/refs/heads/main.tar.gz" -C "$tmp" bernie-main
+    mkdir -p "$tmp/go/bin"
+    write_fake_go "$tmp/go/bin/go" "$gover"
+    tar -czf "$dir/go/go1.26.10.linux-amd64.tar.gz" -C "$tmp" go
+    (cd "$dir/go" && sha256sum go1.26.10.linux-amd64.tar.gz | cut -d' ' -f1 >go1.26.10.linux-amd64.tar.gz.sha256)
+    rm -rf "$tmp"
+}
+
+# write_fake_go FILE VERSION writes a Go that answers `env GOVERSION` and whose
+# `build -o OUT` writes a fake bernie.
+write_fake_go() {
+    cat >"$1" <<EOF
+#!/bin/sh
+case "\$1" in
+    env) printf 'go$2\n' ;;
+    version) printf 'go version go$2 linux/amd64\n' ;;
+    build)
+        while [ \$# -gt 0 ]; do
+            if [ "\$1" = -o ]; then out=\$2; fi
+            shift
+        done
+        cat >"\$out" <<'BIN'
+#!/bin/sh
+case "\$1" in
+    version) printf 'bernie src\n' ;;
+    *) printf '%s\n' "\$*" >>"\$UP_LOG" ;;
+esac
+BIN
+        chmod 0755 "\$out" ;;
+esac
+EOF
+    chmod 0755 "$1"
+}
+
+# run_latest runs install.sh with no release tag. $3 is a PATH prefix, and
+# the rest are flags. Stdin is empty, so there is no keyboard.
+run_latest() {
+    local t="$1" port="$2" prefix="$3"
+    shift 3
+    set +e
+    PATH="$prefix:$PATH" UP_LOG="$t/up.log" BERNIE_BASE_URL="http://127.0.0.1:$port" \
+        BERNIE_BIN_DIR="$t/bin" BERNIE_GO_DIR="$t/godir" BERNIE_VERSION=latest \
+        BERNIE_GO_URL="http://127.0.0.1:$port/go" \
+        setsid sh "$t/install.sh" "$@" >"$t/out" 2>&1 </dev/null
+    echo $? >"$t/rc"
+    set -e
+}
+
+echo "test 12: no release and an old Go: fetches Go and builds"
+t=$(setup)
+build_release "$t/release"
+build_source_tree "$t/release" 1.26.10
+mkdir -p "$t/oldgo"
+write_fake_go "$t/oldgo/go" 1.20.1
+read -r server_pid server_port < <(start_server "$t/release")
+run_latest "$t" "$server_port" "$t/oldgo"
+rc=$(cat "$t/rc"); out=$(cat "$t/out")
+assert_equals "source build exit code" "$rc" "0"
+assert_contains "source build says why" "$out" "no release to download"
+assert_contains "source build fetches Go" "$out" "downloading http://127.0.0.1:$server_port/go/go1.26.10.linux-amd64.tar.gz"
+assert_contains "source build installs" "$out" "installed bernie src"
+if [ ! -x "$t/godir/go1.26.10/bin/go" ]; then
+    printf '  FAIL  Go is not in the folder of the user\n'; exit 1
+fi
+printf '  PASS  Go is in the folder of the user\n'
+# A second run reuses that Go: the server no longer has it.
+rm -f "$t/release/go/"*
+run_latest "$t" "$server_port" "$t/oldgo"
+stop_server "$server_pid"
+assert_equals "second build exit code" "$(cat "$t/rc")" "0"
+assert_contains "second build reuses Go" "$(cat "$t/out")" "using $t/godir/go1.26.10/bin/go"
+teardown "$t"
+
+echo "test 13: a Go with a wrong checksum is refused"
+t=$(setup)
+build_release "$t/release"
+build_source_tree "$t/release" 1.26.10
+printf 'x' >>"$t/release/go/go1.26.10.linux-amd64.tar.gz"
+mkdir -p "$t/oldgo"
+write_fake_go "$t/oldgo/go" 1.20.1
+read -r server_pid server_port < <(start_server "$t/release")
+run_latest "$t" "$server_port" "$t/oldgo"
+stop_server "$server_pid"
+assert_equals "bad Go exit code" "$(cat "$t/rc")" "1"
+assert_contains "bad Go message" "$(cat "$t/out")" "does not match"
+if [ -e "$t/bin/bernie" ]; then
+    printf '  FAIL  a bad Go still installed bernie\n'; exit 1
+fi
+printf '  PASS  a bad Go installed nothing\n'
+teardown "$t"
+
+echo "test 14: a new enough Go on the PATH is used"
+t=$(setup)
+build_release "$t/release"
+build_source_tree "$t/release" 1.26.10
+rm -f "$t/release/go/"*
+mkdir -p "$t/newgo"
+write_fake_go "$t/newgo/go" 1.27.0
+read -r server_pid server_port < <(start_server "$t/release")
+run_latest "$t" "$server_port" "$t/newgo"
+stop_server "$server_pid"
+assert_equals "system Go exit code" "$(cat "$t/rc")" "0"
+assert_contains "system Go is used" "$(cat "$t/out")" "using $t/newgo/go (go1.27.0)"
+teardown "$t"
+
+echo "test 15: a checksum mismatch of a release never falls back to the source"
+t=$(setup)
+build_release_corrupt "$t/release"
+build_source_tree "$t/release" 1.26.10
+mkdir -p "$t/release/releases/latest"
+cp -r "$t/release/releases/download/$TAG" "$t/release/releases/latest/download"
+mkdir -p "$t/newgo"
+write_fake_go "$t/newgo/go" 1.27.0
+read -r server_pid server_port < <(start_server "$t/release")
+run_latest "$t" "$server_port" "$t/newgo"
+stop_server "$server_pid"
+assert_equals "corrupt release exit code" "$(cat "$t/rc")" "1"
+assert_contains "corrupt release message" "$(cat "$t/out")" "checksum mismatch"
+teardown "$t"
+
+echo "test 16: a missing tag does not build main"
+t=$(setup)
+build_release "$t/release"
+read -r server_pid server_port < <(start_server "$t/release")
+run_install "$t" "http://127.0.0.1:$server_port" "$t/bin" "--version v9.9.9"
+stop_server "$server_pid"
+assert_equals "missing tag exit code" "$(cat "$t/rc")" "1"
+assert_contains "missing tag message" "$(cat "$t/out")" "--from-source"
+teardown "$t"
+
+echo "test 17: --up --yes runs bernie up after the install"
+t=$(setup)
+build_release "$t/release"
+build_source_tree "$t/release" 1.26.10
+mkdir -p "$t/newgo"
+write_fake_go "$t/newgo/go" 1.27.0
+read -r server_pid server_port < <(start_server "$t/release")
+run_latest "$t" "$server_port" "$t/newgo" --up --yes
+assert_equals "--up --yes exit code" "$(cat "$t/rc")" "0"
+assert_equals "--up --yes runs up" "$(cat "$t/up.log")" "up --yes"
+# No terminal and no --yes: it must not change the host unasked.
+: >"$t/up.log"
+run_latest "$t" "$server_port" "$t/newgo" --up
+stop_server "$server_pid"
+assert_equals "--up without a terminal exit code" "$(cat "$t/rc")" "1"
+assert_contains "--up without a terminal message" "$(cat "$t/out")" "--up --yes"
+assert_equals "--up without a terminal did not run up" "$(cat "$t/up.log")" ""
+teardown "$t"
+
+echo "test 18: --up does not combine with --start"
+t=$(setup)
+set +e
+sh "$t/install.sh" --up --start >"$t/out" 2>&1
+echo $? >"$t/rc"
+set -e
+assert_equals "--up --start exit code" "$(cat "$t/rc")" "2"
+assert_contains "--up --start message" "$(cat "$t/out")" "do not combine"
 teardown "$t"
 
 echo "all install tests passed"
