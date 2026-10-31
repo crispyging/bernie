@@ -347,6 +347,13 @@ function paintSetupProgress(id) {
  *  per second is enough for the row, and the page keeps its sockets. */
 const setupRefreshRun = (() => {
   let lastRead = 0;
+  /** lastLine is the last readable line of a step log (no command echo). */
+  function lastLine(lines) {
+    for (let i = (lines || []).length - 1; i >= 0; i--) {
+      const t = String(lines[i] || "").replace(/^\[[^\]]*\]\s*/, "").trim();
+      if (t && t.indexOf("$ ") !== 0) return t.length > 160 ? t.slice(0, 159) + "\u2026" : t;
+    }
+  }
   return async function setupRefreshRun(id) {
     const now = Date.now();
     if (now - lastRead < 900) return;
@@ -370,14 +377,16 @@ const setupRefreshRun = (() => {
       : (step.state === "running" ? "working… " + setupElapsedText(live) : "");
     // The verify job has no row in the checklist: its output stays in the
     // log of the step.
-    if (id !== "path" && id !== "verify" && step.log_path) {
+    if (id !== "verify" && step.log_path) {
       let log = null;
-      try {
-        log = await api("/api/setup/runs/" + encodeURIComponent(run.id) + "/log/" + encodeURIComponent(step.id));
-      } catch (e) { log = null; }
+      try { log = await api("/api/setup/runs/" + encodeURIComponent(run.id) + "/log/" + encodeURIComponent(step.id)); } catch (e) { log = null; }
       setupLogs[id] = (log && log.lines) || [];
     }
-    if (id === "path") setupPaintPath(); else paintSetupProgress(id);
+    if (id !== "path") return paintSetupProgress(id);
+    // The box says what the step is doing: the last log line is the
+    // heartbeat of a long build.
+    live.logLine = lastLine(setupLogs.path);
+    setupPaintPath();
   };
 })();
 

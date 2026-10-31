@@ -217,6 +217,9 @@ function setupPaintPath() {
     h("p.small.muted", running ? "bernie is setting up this box." : (live.failed ? "The setup stopped." : "The setup is done.")),
     h("p.step-progress-sentence", live.phase),
     live.detail ? h("p.small.muted", live.detail) : null,
+    // The last line of the step log: a build prints a heartbeat, so the
+    // box shows it is alive without the reader opening the log.
+    live.logLine ? h("p.small.muted.mono.step-log-line", live.logLine) : null,
     setupRunRows(),
     setupPythonEnv(),
     commands.map((c) => cmdBlock(c, "Copy the command")),
