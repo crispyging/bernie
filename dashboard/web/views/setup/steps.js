@@ -39,6 +39,14 @@ async function runSetupStep(step, options = {}) {
  *  when the job ends. */
 function followSetupJob(step, job, options) {
   const id = step.id;
+  // Re-attaching the same job must not leave the old stream open: the
+  // server replays every line from the first, so two streams on one job
+  // double the output and double the requests.
+  const previous = setupStreams[id];
+  if (previous) {
+    previous.close();
+    delete setupStreams[id];
+  }
   const stop = () => {
     const stream = setupStreams[id];
     if (stream) {
@@ -221,7 +229,7 @@ function setupDuration(seconds) {
   return Math.round(s / 60) + " min";
 }
 
-// setupTicker is the 1 Hz tick that refreshes the elapsed time of any
+// setupTicker is the 1 Hz tick that refreshes the elapsed time of a
 // running step. Setup events carry their own paint, but the build of a
 // big wheel (causal-conv1d, vllm) can take minutes between events; without
 // the tick the page would freeze on "working… 1 s" for that whole window.
@@ -332,31 +340,46 @@ function paintSetupProgress(id) {
 
 /** setupRefreshRun reads the record of the setup run and paints the row it
  *  belongs to. The record is the one source of the progress of the setup:
- *  the CLI, the MCP server and the page read it (spec §6.4). */
-async function setupRefreshRun(id) {
-  let doc = null;
-  try { doc = await api("/api/setup/runs"); } catch (e) { return; }
-  const run = (doc && doc.run) || null;
-  setupState.run = run;
-  if (!run || !run.steps || !run.steps.length) return;
-  const steps = run.steps;
-  const step = steps.find((s) => s.state === "running") || steps[steps.length - 1];
-  const live = id === "path" ? setupProgress.path : (setupProgress[id] || (setupProgress[id] = {}));
-  if (!live || live.failed) return;
-  live.phase = step.id + ": " + step.state +
-    (step.progress && step.progress.sentence ? " (" + step.progress.sentence + ")" : "");
-  live.detail = step.duration_s > 0 ? setupDuration(step.duration_s) : "";
-  // The verify job has no row in the checklist: its output stays in the
-  // log of the step.
-  if (id !== "path" && id !== "verify" && step.log_path) {
-    let log = null;
-    try {
-      log = await api("/api/setup/runs/" + encodeURIComponent(run.id) + "/log/" + encodeURIComponent(step.id));
-    } catch (e) { log = null; }
-    setupLogs[id] = (log && log.lines) || [];
-  }
-  if (id === "path") setupPaintPath(); else paintSetupProgress(id);
-}
+ *  the CLI, the MCP server and the page read it (spec §6.4).
+ *
+ *  A job can print thousands of lines (a pip build). The record changes
+ *  only when a step starts or ends, so the read is throttled: one read
+ *  per second is enough for the row, and the page keeps its sockets. */
+const setupRefreshRun = (() => {
+  let lastRead = 0;
+  return async function setupRefreshRun(id) {
+    const now = Date.now();
+    if (now - lastRead < 900) return;
+    lastRead = now;
+    let doc = null;
+    try { doc = await api("/api/setup/runs"); } catch (e) { return; }
+    const run = (doc && doc.run) || null;
+    setupState.run = run;
+    if (!run || !run.steps || !run.steps.length) return;
+    const steps = run.steps;
+    const step = steps.find((s) => s.state === "running") || steps[steps.length - 1];
+    const live = id === "path" ? setupProgress.path : (setupProgress[id] || (setupProgress[id] = {}));
+    if (!live || live.failed) return;
+    // The title of the step is the sentence a person reads ("Clone and
+    // build the vLLM fork"); the id is for machines.
+    live.phase = (step.title || step.id) + ": " + step.state +
+      (step.progress && step.progress.sentence ? " (" + step.progress.sentence + ")" : "");
+    // A running step has no duration yet; the live one is the elapsed time.
+    live.detail = step.duration_s > 0
+      ? setupDuration(step.duration_s)
+      : (step.state === "running" ? "working… " + setupElapsedText(live) : "");
+    // The verify job has no row in the checklist: its output stays in the
+    // log of the step.
+    if (id !== "path" && id !== "verify" && step.log_path) {
+      let log = null;
+      try {
+        log = await api("/api/setup/runs/" + encodeURIComponent(run.id) + "/log/" + encodeURIComponent(step.id));
+      } catch (e) { log = null; }
+      setupLogs[id] = (log && log.lines) || [];
+    }
+    if (id === "path") setupPaintPath(); else paintSetupProgress(id);
+  };
+})();
 
 /** setupStopStreams closes the job streams of the tab. */
 function setupStopStreams() {

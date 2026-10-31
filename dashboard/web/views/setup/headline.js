@@ -8,7 +8,10 @@ function setupHeadline(doc) {
   const steps = doc.steps || [];
   const path = steps.filter((s) => !SETUP_EXTRA_STEPS.includes(s.id));
   const pending = path.filter((s) => s.state !== "done" && s.state !== "skipped");
-  const running = path.find((s) => s.state === "running");
+  const runningStep = path.find((s) => s.state === "running");
+  // A setup run is not a row of the checklist; look at doc.path too.
+  const runningPath = !runningStep && doc.path && doc.path.state === "running" ? doc.path : null;
+  const running = runningStep || runningPath;
   const hardware = steps.find((s) => s.id === "hardware");
   const serve = steps.find((s) => s.id === "serve");
   if (setupServerServing(serve)) {
@@ -19,8 +22,13 @@ function setupHeadline(doc) {
     };
   }
   if (running) {
-    const phase = (running.progress && running.progress.phase) || running.summary || "bernie is working on the next step.";
-    return { title: "SETTING UP THIS BOX.", lede: phase, action: "continue" };
+    const phase = (running.phase ||
+      (running.progress && running.progress.phase) ||
+      running.summary ||
+      "bernie is working on the next step.").trim();
+    // "watch" when the whole path runs: "Run the rest of the steps" would
+    // start a second run.
+    return { title: "SETTING UP THIS BOX.", lede: phase, action: runningPath ? "watch" : "continue" };
   }
   if (!pending.length) {
     return {
@@ -103,6 +111,18 @@ function setupHeadActions(doc, say) {
   }
   if (say.action === "continue") {
     out.push(h("button.primary", { type: "button", onclick: setupRunNextStep }, "Run the rest of the steps"));
+    out.push(h("button", { type: "button", onclick: () => loadSetupDocument() }, "Re-check"));
+    return out;
+  }
+  if (say.action === "watch") {
+    // The path is running: the button brings the reader to the live
+    // progress instead of starting a second run.
+    out.push(h("button.primary", {
+      type: "button",
+      onclick: () => {
+        if (setupState.pathBox) setupState.pathBox.scrollIntoView({ behavior: "smooth", block: "center" });
+      },
+    }, "Watch the setup"));
     out.push(h("button", { type: "button", onclick: () => loadSetupDocument() }, "Re-check"));
     return out;
   }

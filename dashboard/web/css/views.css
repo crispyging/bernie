@@ -54,8 +54,7 @@
 .step-progress-sentence { margin: 0 0 6px; font-size: 13px; color: var(--text-2); }
 .step-progress-detail { color: var(--muted); font-size: var(--small); }
 
-/* The run rows under the path box: one line per step. A running step is
-   highlighted and ticks once per second (setupPaintRunRows). */
+/* The run rows under the path box: one line per step. */
 .step-run-row {
   display: flex;
   gap: var(--space-2);
@@ -78,17 +77,14 @@
   border-radius: 50%;
   background: var(--accent);
   flex: 0 0 auto;
-  animation: stepRunPulse 1.2s ease-in-out infinite;
-}
-@keyframes stepRunPulse {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.35; transform: scale(0.7); }
 }
 .step-run-row-state {
   text-transform: lowercase;
   color: var(--muted);
   font-weight: 400;
 }
+.step-run-head { margin: 0 0 4px; }
+.step-run-list { display: flex; flex-direction: column; gap: 2px; }
 .step-log-box { margin-top: var(--space-2); }
 .step-log { max-height: 200px; overflow: auto; }
 

@@ -39,6 +39,10 @@ async function setupRunPath() {
   }
   setupState.pathJobID = job.id;
   followSetupJob({ id: "path" }, job, { onRefresh: () => { setupRefreshRun("path"); loadSetupDocument(); } });
+  // One read so the headline says the box is being set up. Not per line:
+  // that is what used to storm the server.
+  loadSetupDocument();
+  if (setupState.pathBox) setupState.pathBox.scrollIntoView({ behavior: "smooth", block: "center" });
 }
 
 /** setupStopPath stops the run of the path. The job ends and the tab says
@@ -64,50 +68,63 @@ async function setupAttachPath(doc) {
   const path = doc && doc.path;
   if (!path || !path.id) return;
   setupState.pathJobID = path.id;
-  setupProgress.path = { phase: path.phase || "Working\u2026" };
+  // Keep the moment the run started: re-attaching after a reload must
+  // not restart the clock.
+  const live = setupProgress.path || {};
+  setupProgress.path = {
+    phase: path.phase || "Working\u2026",
+    started: live.started || Date.now(),
+  };
   setupPaintPath();
   if (path.state !== "running") return;
-  setupLogs.path = [];
+  if (!setupLogs.path) setupLogs.path = [];
   followSetupJob({ id: "path" }, { id: path.id }, { onRefresh: () => { setupRefreshRun("path"); loadSetupDocument(); } });
 }
 
-/** setupRunRows draws the steps of the setup run with their state and the
- *  time they took. The record of the run is the one source (spec §6.4). */
+/** setupRunRows draws the steps of the setup run with the time they took
+ *  (spec §6.4). The title of a step is the human sentence; the id is
+ *  for machines. */
 function setupRunRows() {
   const run = setupState.run;
   if (!run || !run.steps || !run.steps.length) return null;
-  return h("div.step-run", run.steps.map((s) => setupRunRow(s)));
+  return h("div.step-run",
+    h("p.small.muted.step-run-head", "What the setup is doing"),
+    h("div.step-run-list", run.steps.map((s) => setupRunRow(s))));
 }
 
-/** setupRunRow is one row of the run list. The class names the state; the
- *  data-step id hooks the tick that re-paints the elapsed time of the
- *  running step. */
+/** setupRunRow is one row of the run list. data-step hooks the tick that
+ *  re-paints the elapsed time of the running step. */
 function setupRunRow(s) {
-  const cls = "step-run-row step-run-row-" + s.state;
-  return h("div", { class: cls, "data-step": s.id },
-    h("span.step-run-row-id", s.id),
+  return h("div", { class: "step-run-row step-run-row-" + s.state, "data-step": s.id },
+    h("span.step-run-row-id", s.title || s.id),
     h("span.step-run-row-state", s.state),
     h("span.step-run-row-duration", { "data-dur": "1" }, setupRunRowDuration(s)));
 }
 
 /** setupRunRowDuration is the elapsed-time text of a row. Frozen when the
- *  step has finished; live (ticked by setupTick) while the step runs. */
+ *  step has finished; live (ticked by setupTick) while the step runs.
+ *  The record carries started_at so the time is right after a reload. */
 function setupRunRowDuration(s) {
   if (s.duration_s > 0) return setupDuration(s.duration_s);
   if (s.state !== "running") return "";
-  // The first paint uses setupProgress.started; later paints just update
-  // the text node. Without a client-side start time, fall back to the
-  // start of the path so the row still ticks.
-  const started = (setupProgress[s.id] && setupProgress[s.id].started) ||
-                  (setupProgress.path && setupProgress.path.started);
-  if (!started) return "";
-  const sec = Math.max(0, Math.round((Date.now() - started) / 1000));
-  return setupDuration(sec);
+  const t = setupRunStepStart(s);
+  if (!t) return "";
+  return setupDuration(Math.max(0, Math.round((Date.now() - t) / 1000)));
 }
 
-/** setupPaintRunRows re-paints the elapsed time of any running run row.
- *  Called every second by the tick in setup.js so a long build shows
- *  "running Ns" without waiting for the next event. */
+/** setupRunStepStart is the moment a step of the run began. */
+function setupRunStepStart(s) {
+  if (s.started_at) {
+    const t = Date.parse(s.started_at);
+    if (!Number.isNaN(t)) return t;
+  }
+  const live = setupProgress[s.id];
+  if (live && live.started) return live.started;
+  return setupProgress.path && setupProgress.path.started || 0;
+}
+
+/** setupPaintRunRows re-paints the elapsed time of any running row
+ *  (called every second by setupTick). */
 function setupPaintRunRows() {
   const run = setupState.run;
   if (!run || !run.steps) return;
@@ -191,6 +208,11 @@ function setupPaintPath() {
   }
   const running = !live.failed && live.phase !== "Done." && live.phase !== "Stopped.";
   const commands = live.commands || [];
+  // The headline follows the run: the reader sees the box is being set
+  // up without waiting for the next read of the checklist.
+  if (running) {
+    setHead(setupState.head, "SETTING UP THIS BOX.", live.phase);
+  }
   put(box,
     h("p.small.muted", running ? "bernie is setting up this box." : (live.failed ? "The setup stopped." : "The setup is done.")),
     h("p.step-progress-sentence", live.phase),

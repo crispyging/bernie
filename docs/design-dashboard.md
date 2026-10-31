@@ -392,16 +392,16 @@ too, and it arrives when the reader asks for it.
 
 | Budget | Target | Measured | Note |
 |---|---|---|---|
-| The whole page (HTML + CSS + JS, uncompressed) | ≤ 375 KB | **356.6 KB** (4.3 + 275.3 + 77.1) | the whole tree; the first paint is 147.4 KB of it |
-| HTML | ≤ 12 KB | **4.3 KB** | `index.html` |
-| CSS | ≤ 80 KB, in eight files | **77.1 KB** | the design said four files; the split is `components.css` (the shared) + `views.css` (the per-tab) + `bench.css` + `classic.css` + `logs.css` + `dashboard.css` |
-| JavaScript | ≤ 290 KB | **275.3 KB** | plain, hand-written and unminified; five tabs of it |
-| JavaScript on the first paint | ≤ 112 KB | **111.6 KB** | the shell (49 KB) + the Setup tab (62 KB: the shared section/pill/empty-state helpers and the one-button path; the chooser and the path runner load on demand) |
-| CSS on the first paint | ≤ 40 KB | **37.5 KB** | `tokens.css`, `layout.css`, `components.css`, `views.css` |
+| The whole page (HTML + CSS + JS, uncompressed) | ≤ 432 KB | **430.5 KB** (6.1 + 346.9 + 77.6) | the whole tree; the first paint is 154.6 KB of it |
+| HTML | ≤ 12 KB | **6.1 KB** | `index.html` |
+| CSS | ≤ 80 KB, in eight files | **77.6 KB** | the design said four files; the split is `components.css` (the shared) + `views.css` (the per-tab) + `bench.css` + `classic.css` + `logs.css` + `dashboard.css` |
+| JavaScript | ≤ 348 KB | **346.9 KB** | plain, hand-written and unminified; five tabs of it |
+| JavaScript on the first paint | ≤ 112 KB | **110.3 KB** | the shell + the Setup tab (the shared section/pill/empty-state helpers and the one-button path; the chooser and the path runner load on demand) |
+| CSS on the first paint | ≤ 40 KB | **38.2 KB** | `tokens.css`, `layout.css`, `components.css`, `views.css` |
 | Fonts | ≤ 130 KB, four woff2, OFL, `font-display: swap`, `unicode-range` | **128.4 KB**, four woff2, swap ✓, range ✓ | the license texts (24.5 KB) sit next to the files; they are not loaded by the page |
 | First-paint requests | ≤ 24 | **21** (1 HTML + 4 CSS + 12 scripts + 4 fonts) | the files of the other tabs come when their tab opens |
 | Transferred text on the first paint (gzip) | ≤ 60 KB | **46.4 KB** (HTML + CSS + JS, 32 %) | the gzipped HTML alone is 1.2 KB |
-| Text of the whole tree (gzip) | ≤ 125 KB | **113.4 KB** (32 %) | the five tabs of plain JavaScript; the same text compresses worse in four files than in one, so the split of the Setup tab costs 1.2 KB of gzip |
+| Text of the whole tree (gzip) | ≤ 149 KB | **148.2 KB** (33 %) | the five tabs of plain JavaScript; the Setup tab grew 1 KB gzipped for the 1 Hz ticker that keeps the elapsed time of a long install live (causal-conv1d, vllm) and for the storm-fix that broke an SSE replay loop |
 | First paint on a loopback host | ≤ 1.0 s | **unmeasured** | the binary runs on this Mac; a measurement on the reference box (par1-cs25) lands in `dashboard/README.md` when the integrator pushes |
 | The live numbers | one stream: `GET /api/telemetry` at 1 Hz drives every tile, every ring, every meter and every sparkline | the stream | the poller pauses while `document.hidden` and reads once on return (`web/js/data.js`) |
 | The poller | one timer for the page, in `js/data.js`; no view opens its own timer | one timer | one `setTimeout` re-arms itself with a delay that grows on error (backoff, capped at 60 s) and shrinks on success |
