@@ -15,12 +15,14 @@ Every item of this group has shipped.
 
 ## Then: honest results and connected clients
 
-| # | Item | Spec | Test |
-|---|---|---|---|
-| 7 | **Model file hashes.** A result stores the hashes of the model files it measured, so a number can be tied to the exact weights. | §10 | A result of a run holds the hashes of the model files. |
+Every item of this group has shipped.
 
 ## Shipped
 
+- **Model file hashes.** A bench result stores `weights`: the files of the
+  model the run loads with the SHA-256 of each, read from the blob names of
+  the hub cache or hashed once for a local directory. Spec
+  [§10](spec.md#10-benchmark).
 - **Redacted report.** `doctor --report` cleans every line of the share
   report: the home path, the user name, the hostname and secrets by shape.
   `removed` lists each kind with the number of places it was taken out.

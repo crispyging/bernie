@@ -189,6 +189,7 @@ tuning data.
 | `internal/serving/vllm/` | the client: `/health`, `/v1/models`, `/tokenize`, `/metrics` | 2 |
 | `internal/serving/bench/` | the streaming benchmark and the result store | 2 |
 | `internal/serving/bench/suite/` | the bench suites: the cells, the comparison, the verdict | 2 |
+| `internal/serving/weights/` | the model files a server loads, with their hashes | 2 |
 | `internal/support/*` | the shared helpers: paths, execx, config, redact, pyenv, factcache, fixture | 0 |
 | `dashboard/` | the server, the API, the auth, the SSE, the telemetry, the JSON helpers and the embedded web assets | 4 |
 | `recipes/` | the built-in recipes by family, the fragments by concern | data |

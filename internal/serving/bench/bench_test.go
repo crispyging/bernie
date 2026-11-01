@@ -324,3 +324,31 @@ func TestStore(t *testing.T) {
 		}
 	}
 }
+
+// A result of a run names the model files the run loads, with the hash of
+// each, read from the hub cache of the plan.
+func TestResultHoldsTheHashesOfTheModelFiles(t *testing.T) {
+	hf := t.TempDir()
+	repo := filepath.Join(hf, "hub", "models--org--m")
+	snap := filepath.Join(repo, "snapshots", "c0ffee")
+	for _, d := range []string{filepath.Join(repo, "refs"), filepath.Join(repo, "blobs"), snap} {
+		if err := os.MkdirAll(d, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	blob := strings.Repeat("ab", 32)
+	_ = os.WriteFile(filepath.Join(repo, "refs", "main"), []byte("c0ffee"), 0o644)
+	_ = os.WriteFile(filepath.Join(repo, "blobs", blob), []byte("w"), 0o644)
+	if err := os.Symlink("../../blobs/"+blob, filepath.Join(snap, "model.safetensors")); err != nil {
+		t.Fatal(err)
+	}
+	state := t.TempDir()
+	writeRun(t, state, "m", `{"name":"m","host":"127.0.0.1","port":18097,"plan":{"model":"org/m","env":{"HF_HOME":"`+hf+`"},"args":["org/m","--port","18097"]}}`)
+	w := modelWeights(state, "http://127.0.0.1:18097")
+	if w == nil || w.Source != "org/m" || w.Commit != "c0ffee" || len(w.Files) != 1 || w.Files[0].SHA256 != blob {
+		t.Fatalf("weights = %+v", w)
+	}
+	if modelWeights(state, "http://127.0.0.1:9999") != nil {
+		t.Error("a URL of no run has weights")
+	}
+}

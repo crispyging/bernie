@@ -1554,6 +1554,18 @@ has no GPU selection, the summary lists every host GPU and `gpu_scope` is
 `all (run selection unknown)`. A known run selection has `gpu_scope` `run`.
 The text and dashboard history show the same summary and scope.
 
+`weights` names the model files the run loads, so a number is tied to the
+exact weights it measured: `{"source", "commit", "files": [{"path",
+"bytes", "sha256", "git_sha1"}]}`. For an HF repo, bernie reads the
+snapshot of the run's revision in the hub cache of the plan (`HF_HOME`,
+else the config): each file links to a blob named by its hash, so nothing
+is read again. `sha256` is the hash of an LFS file; a small file kept in git
+has its git blob hash in `git_sha1` instead. For a local directory, bernie
+hashes every file with SHA-256 and keeps the hashes in
+`<cache>/weights/`, keyed by path, size and modification time, so the
+weights are read once. `weights` is absent for a server bernie did not
+start (no plan) and when the files cannot be read.
+
 ### 10.1 What the numbers mean
 
 Every cell reports five groups of numbers. The unit is part of the name:
