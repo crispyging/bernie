@@ -145,6 +145,20 @@ other file, script or compose file is required.
   it and the step to do now. `status --json` carries the same steps in the
   `onboarding` field. `--steps` changes the human text only: the JSON
   document is the same with and without it.
+
+  `status --json` has `next`: the commands to type now, most important
+  first. Each state of the host has its own:
+
+  | State | `next` |
+  |---|---|
+  | No GPU is usable | the fix of the blocking check, with the reason after `#` |
+  | No recipe fits | `bernie recipe list --all   # No recipe fits this host.` |
+  | A recipe fits, nothing serves | `bernie up RECIPE` |
+  | A run is starting | `bernie logs NAME -f   # NAME is starting: WAITING`, then `bernie dash` |
+  | A run is running | `bernie dash`, then `bernie bench` |
+
+  A run is starting until it answers a completion ([§8.3](#83-run-record))
+  and while its log shows a loading phase. WAITING is its `waiting` reason.
 - `bernie setup apply` runs the steps of the install plan
   ([\u00a76](#6-setup)). It streams one line per step and keeps the log of
   every step. `bernie setup report` prints the record of the run and

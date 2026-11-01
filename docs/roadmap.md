@@ -11,9 +11,7 @@ Each item has a spec section and one test that proves it.
 
 ## Next: make `up` work the first time
 
-| # | Item | Spec | Test |
-|---|---|---|---|
-| 6 | **Next command in every state.** `status --json` has `next` for: no GPU, no recipe fits, recipe fits, run starting, run ready. | §3.1 | Fixture set covers the five states. |
+Every item of this group has shipped.
 
 ## Then: honest results and connected clients
 
@@ -26,6 +24,10 @@ Each item has a spec section and one test that proves it.
 
 ## Shipped
 
+- **Next command in every state.** `status --json` has its own `next` for
+  no GPU, no recipe fits, a recipe fits, a run starting and a run running.
+  A starting run points at its log and says what it waits for; it is not
+  benchmarked. Spec [§3.1](spec.md#31-the-default-run-the-binary).
 - **Log doctor on failure.** When a run exits during startup, `serve` and
   `up` scan its log and print every matched rule: id, cause, fix, doc link
   and the line. `--json` carries them in `log_findings`. Spec
