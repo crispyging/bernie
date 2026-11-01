@@ -1,46 +1,38 @@
 "use strict";
-// ---------- Chat ----------
-// One prompt, one answer. The tab asks the run that is serving and streams
-// the answer back as it comes. It keeps no history: the prompt and the
-// answer are not stored.
-
-// The state of the tab: the errors of the last answer. A stopped answer is
-// not an error: the reader stopped it on purpose.
+// One prompt, one streamed answer; no stored conversation history.
 const chatState = { errors: {} };
 
-/** viewChat opens the Chat tab: the prompt, the button and the answer. */
 async function viewChat(root) {
   const head = stateHead("Chat");
   const prompt = h("textarea.chat-prompt", {
     id: "chat-prompt", rows: "3", placeholder: "Ask the model one question",
-    "aria-label": "Your prompt",
+    "aria-label": "Your question", disabled: true,
   });
-  const send = h("button.primary", { type: "button", id: "chat-send" }, "Send");
-  const stop = h("button", { type: "button", id: "chat-stop", hidden: true }, "Stop");
-  const reasoning = h("div.chat-reasoning", { hidden: true });
+  const send = h("button.primary", { type: "button", id: "chat-send", disabled: true }, "Send prompt");
+  const stop = h("button", { type: "button", id: "chat-stop", hidden: true }, "Stop answer");
+  const check = h("button", { type: "button" }, "Check again");
+  const reasoningText = h("div");
+  const reasoning = h("details.chat-reasoning", { hidden: true }, h("summary", "Model reasoning"), reasoningText);
   const reply = h("div.chat-reply");
-  const metrics = h("p.chat-metrics");
-  const note = h("p.chat-note", "No history is kept: the prompt and the answer are not stored.");
-  const modelLine = h("p.chat-model", "Model: …");
-  const box = h("div.chat-box", prompt, modelLine, h("div.chat-actions", send, stop));
-  put(root, head, box, h("div.chat-answer", reasoning, reply, metrics), note);
+  const metrics = h("p.chat-metrics", { role: "status", "aria-live": "polite" });
+  const modelLine = h("div.chat-model");
+  const box = h("div.chat-box", modelLine, h("label", { for: "chat-prompt" }, "Your question"), prompt,
+    h("div.chat-actions", send, stop, check), h("p.small.muted", "⌘/Ctrl + Enter to send. Stop answer cancels only this response, not the model server."));
+  put(root, head, box, h("div.chat-answer", reasoning, reply, metrics),
+    h("p.chat-note", "A one-prompt test, not a conversation. The dashboard keeps no chat history. Use Check again after changing servers."),
+    h("p.chat-note", h("a", { href: "#dashboard" }, "Model status and connection details"), " · ",
+      h("a", { href: "#logs" }, "Open Logs"), " · ", h("a", { href: "#setup" }, "Start a model")));
+  let controller = null, busy = false, ready = false;
 
-  let controller = null;
-  let busy = false;
-
-  /** numbers writes the numbers of the answer: the time to the first token
-   *  and the output speed, with their units. */
   function numbers(doc) {
     const parts = [];
     if (doc.ttft_ms != null) parts.push(doc.ttft_ms + " ms to the first token");
-    if (doc.tok_s != null) parts.push(doc.tok_s + " tok/s");
+    if (doc.tok_s != null) parts.push(doc.tok_s + " tokens/s");
     return parts.join(" · ");
   }
 
-  /** event reads one frame of the stream: its name and its document. */
   function event(frame) {
-    let name = "";
-    let data = "";
+    let name = "", data = "";
     for (const line of frame.split("\n")) {
       if (line.startsWith("event: ")) name = line.slice(7).trim();
       else if (line.startsWith("data: ")) data += line.slice(6);
@@ -51,25 +43,16 @@ async function viewChat(root) {
     return { name: name, doc: doc };
   }
 
-  /** stream sends the prompt and reads the answer as it comes. The handlers
-   *  get the events of the stream. The body is read to the end and the
-   *  reader lets go of it: the browser closes the request instead of
-   *  cancelling it, so a finished answer leaves no network error behind. */
+  // Drain completed responses normally; cancellation uses the same request.
   async function stream(text, handlers) {
     controller = new AbortController();
     const response = await fetch("/api/chat", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Bernie": "1" },
-      credentials: "same-origin",
-      body: JSON.stringify({ prompt: text }),
-      signal: controller.signal,
+      method: "POST", headers: { "Content-Type": "application/json", "X-Bernie": "1" },
+      credentials: "same-origin", body: JSON.stringify({ prompt: text }), signal: controller.signal,
     });
     if (!response.ok) {
       let msg = response.status + " " + response.statusText;
-      try {
-        const doc = await response.json();
-        if (doc && doc.error) msg = doc.error;
-      } catch { /* the answer was not JSON */ }
+      try { const doc = await response.json(); if (doc && doc.error) msg = doc.error; } catch { /* non-JSON error */ }
       throw new Error(msg);
     }
     const reader = response.body.getReader();
@@ -90,100 +73,118 @@ async function viewChat(root) {
         }
       }
     } finally {
-      try { reader.releaseLock(); } catch (e) { /* the body is closed already */ }
+      try { reader.releaseLock(); } catch { /* already closed */ }
     }
   }
 
-  /** ask sends the prompt of the box and shows the answer as it comes. */
   async function ask() {
-    if (busy) return;
+    if (busy || !ready) return;
     const text = prompt.value.trim();
-    if (!text) {
-      prompt.focus();
-      return;
-    }
+    if (!text) { prompt.focus(); return; }
     busy = true;
-    send.disabled = true;
+    send.disabled = check.disabled = true;
     stop.hidden = false;
-    reply.textContent = "";
-    reasoning.textContent = "";
+    reply.textContent = reasoningText.textContent = "";
     reasoning.hidden = true;
-    metrics.textContent = "";
+    metrics.textContent = "Sending prompt. Waiting for the model to respond…";
+    let ended = false;
     try {
       await stream(text, {
-        delta: (doc) => { reply.textContent += doc.text || ""; },
-        reasoning: (doc) => {
-          reasoning.hidden = false;
-          reasoning.textContent += doc.text || "";
+        delta: (doc) => {
+          if (!reply.textContent) metrics.textContent = "Receiving the answer…";
+          reply.textContent += doc.text || "";
         },
-        // The answer is over: the Stop button goes away at once, so a click
-        // on it cannot cancel a request that is already finished.
-        done: (doc) => { metrics.textContent = numbers(doc); stop.hidden = true; },
+        reasoning: (doc) => {
+          if (reasoning.hidden) metrics.textContent = "The model is reasoning before answering…";
+          reasoning.hidden = false;
+          reasoningText.textContent += doc.text || "";
+        },
+        done: (doc) => {
+          ended = true;
+          metrics.textContent = numbers(doc) || "Answer complete.";
+          if (!reply.textContent) reply.textContent = "The model finished without answer text.";
+          stop.hidden = true;
+        },
         error: (doc) => {
-          metrics.textContent = doc.error || "the answer failed";
+          ended = true;
+          metrics.textContent = doc.error || "The answer failed. Open Logs for details.";
           chatState.errors["/api/chat"] = metrics.textContent;
           stop.hidden = true;
         },
       });
+      if (!ended) {
+        metrics.textContent = "The answer stream ended before completion. Check Logs, then try again.";
+        chatState.errors["/api/chat"] = metrics.textContent;
+      }
     } catch (e) {
-      if (e && e.name === "AbortError") {
-        // The reader stopped the answer on purpose: that is not an error.
-        metrics.textContent = "The answer was stopped.";
-      } else {
-        chatState.errors["/api/chat"] = (e && e.message) || "the request failed";
+      if (e && e.name === "AbortError") metrics.textContent = "The answer was stopped. This does not stop the model server.";
+      else {
+        chatState.errors["/api/chat"] = (e && e.message) || "The request failed.";
         metrics.textContent = chatState.errors["/api/chat"];
       }
     } finally {
       busy = false;
       controller = null;
-      send.disabled = false;
+      send.disabled = !ready;
+      check.disabled = false;
       stop.hidden = true;
     }
   }
 
-  send.addEventListener("click", ask);
-  stop.addEventListener("click", () => {
-    if (controller) controller.abort();
-  });
-  prompt.addEventListener("keydown", (e) => {
-    if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-      e.preventDefault();
-      ask();
-    }
-  });
-
-  // The tab asks the run list: a box without a server under it would only
-  // answer with an error. When a run is up, the model line shows the first
-  // id the server reports (GET /api/models, ia.md R31); an older release
-  // without /v1/models falls back to the recipe name.
-  let serving = false;
-  let modelName = "";
-  try {
-    const runs = runsOf(await api("/api/runs"));
-    serving = runs.some((r) => r.state === "running");
-    const live = runs.find((r) => r.state === "running") || runs[0];
-    if (live) {
-      try {
-        const mod = await api("/api/models");
-        const ids = mod && mod.running;
-        if (Array.isArray(ids) && ids.length) modelName = ids[0];
-      } catch { /* the live model id is best-effort */ }
-      if (!modelName) {
-        const plan = live.plan || {};
-        modelName = plan.served_name || plan.model || live.recipe || live.name || "";
+  async function loadModel() {
+    if (busy) return;
+    ready = false;
+    send.disabled = prompt.disabled = check.disabled = true;
+    setHead(head, "Checking model availability", "Checking which server this one-prompt test will use.");
+    modelLine.textContent = "Reading model servers…";
+    try {
+      const runs = runsOf(await api("/api/runs"));
+      const active = runs.filter((r) => r.state !== "exited");
+      const live = active[0]; // Matches ChatTarget: oldest non-exited run, not first ready run.
+      if (!live) {
+        setHead(head, "Start a model to chat", "No model server is active on this host.");
+        put(modelLine, emptyState("No model is available yet.", h("a", { href: "#setup" }, "Start a model in Setup"), "bernie serve <recipe>"));
+        return;
       }
+      const phase = (live.phase || {}).id;
+      const failed = phase === "failed";
+      const unresponsive = live.answering === false || live.state === "unresponsive"
+        || (live.state === "starting" && (live.foreign || phase === "ready"));
+      ready = live.state === "running" && !failed && !unresponsive;
+      let reported = "", modelError = "";
+      if (ready) {
+        try {
+          const mod = await api("/api/models");
+          if (mod && Array.isArray(mod.running)) reported = mod.running[0] || "";
+          modelError = mod && mod.live_error || "";
+        } catch (e) { modelError = e.message || String(e); }
+      }
+      const plan = live.plan || {};
+      const model = reported || plan.served_name || plan.model || live.recipe || live.name;
+      put(modelLine, h("b", (reported ? "Model: " : "Configured model: ") + model), " · Server: " + live.name,
+        active.length > 1 ? h("p.small.muted", active.length + " servers are active. Chat automatically uses the oldest active server at send time, even if another is ready. To use another server, connect an app to its API URL.") : null,
+        modelError ? h("p.small", "The model list could not be read: " + modelError + ". A prompt will test whether this server can answer.") : null);
+      setHead(head, ready ? "Ready for a test prompt" : failed ? "The server reported a failure"
+        : unresponsive ? "The server is not responding" : "The model is still starting",
+        ready ? "The health check passed. Send one question to test an actual answer."
+          : failed || unresponsive ? "Open Logs to investigate, then use Check again."
+            : ((live.phase || {}).sentence || "The server has not passed its health check yet.") + " Follow progress on Dashboard, then use Check again.");
+    } catch (e) {
+      chatState.errors["/api/runs"] = e.message || String(e);
+      setHead(head, "Model status unavailable", "The server list could not be checked; this does not mean no model is running.");
+      put(modelLine, emptyState("Could not check model availability.", chatState.errors["/api/runs"] + " · Use Check again or open Dashboard.", "bernie ps"));
+    } finally {
+      send.disabled = prompt.disabled = !ready;
+      check.disabled = false;
     }
-  } catch (e) { /* nothing serves: the empty state says so */ }
-  modelLine.textContent = modelName ? "Model: " + modelName : "Model: –";
-  if (!serving) {
-    setHead(head, "NO MODEL IS SERVING.", "Start one on the Setup tab, then ask it a question.");
-    put(box, emptyState("No model is serving on this host.",
-      h("a", { href: "#setup" }, "Set up this box"),
-      "bernie serve <recipe>"));
-    send.disabled = true;
-    prompt.disabled = true;
-    return;
   }
-  setHead(head, "THE MODEL IS SERVING.", "Ask one question: the answer comes back piece by piece.");
-  prompt.focus();
+
+  send.addEventListener("click", ask);
+  stop.addEventListener("click", () => { if (controller) controller.abort(); });
+  check.addEventListener("click", loadModel);
+  prompt.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); ask(); }
+  });
+  await loadModel();
+  if (ready) prompt.focus();
 }

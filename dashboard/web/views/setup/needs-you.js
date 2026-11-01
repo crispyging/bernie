@@ -1,19 +1,12 @@
-// The "Needs you" section of the Setup tab: the items only the operator
-// can do, above the path. The file is loaded lazily so the first paint
-// does not carry it. See ia.md §5 R40.
+// Operator-only prerequisites; commands stay available in either mode.
 "use strict";
 
-/** paintSetupNeedsYouRender writes the "Needs you" section: the items only the
- *  operator can do, above the path. The section is hidden when there is
- *  nothing to do; the timeline below carries the routine steps. */
 function paintSetupNeedsYouRender(doc) {
   const box = setupState.needsYou;
   if (!box) return;
   if (!doc) doc = setupState.doc;
   if (!doc) return;
   const path = (doc.steps || []).filter((s) => !SETUP_EXTRA_STEPS.includes(s.id));
-  // A step belongs here when bernie cannot run it itself: it is blocked, or
-  // it needs a root command only the operator can run.
   const items = path.filter((s) => s.state === "blocked"
     || (s.state !== "done" && s.state !== "skipped" && (s.root_commands || []).length));
   if (!items.length) {
@@ -23,26 +16,21 @@ function paintSetupNeedsYouRender(doc) {
   }
   put(box,
     sectionLabel("Needs you"),
-    h("p.small.muted", "A step bernie cannot run itself. Copy the command, run it as root in a terminal, then press Re-check."),
+    h("p.small.muted", "These prerequisites need your attention before setup can continue."),
     h("div.needs-you-list", items.map(setupNeedsYouItem)),
     h("div.needs-you-foot",
-      h("button", { type: "button", onclick: () => loadSetupDocument() }, "Re-check"),
-      h("a.small", { href: "#setup-doctor" }, "the doctor report")));
+      h("button", { type: "button", onclick: () => loadSetupDocument() }, "Re-check host"),
+      h("button", { type: "button", onclick: focusSetupDoctor }, "Read host checks")));
   box.hidden = false;
 }
 
-/** setupNeedsYouItem is one row of the "Needs you" section: the state
- *  word, the title, the reason, the root command (if any) with a copy
- *  button. The row never blames the reader (Setup rule 9). */
 function setupNeedsYouItem(step) {
-  const blocked = step.state === "blocked";
-  const root = (step.root_commands || [])[0];
+  const roots = step.root_commands || [];
   return h("div.needs-you-item",
-    h("div.needs-you-head",
-      statePill(blocked ? "fail" : "warn", blocked ? "blocked" : "root"),
+    h("div.needs-you-head", statePill("warn", roots.length ? "administrator access" : "needs attention"),
       h("span.needs-you-title", step.title || step.id || "")),
     step.summary ? h("p.needs-you-summary", step.summary) : null,
-    root ? h("div.needs-you-command",
-      cmdBlock(root, "Copy the command"),
-      h("p.small.muted", "run it as root in a terminal.")) : null);
+    roots.length ? h("details.advanced.needs-you-command", h("summary", "Show commands to run as administrator"),
+      h("p.small.muted", "Run these in a terminal as root, then re-check the host."),
+      roots.map((command) => cmdBlock(command, "Copy the command"))) : null);
 }

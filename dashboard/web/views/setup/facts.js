@@ -1,22 +1,19 @@
-// The facts of the host on the Setup tab: the numbers and why they matter.
-// Adapted from vllm-rdna-dash by CrispyGinger, used with permission.
+// Setup host summary. Adapted from vllm-rdna-dash by CrispyGinger, with permission.
 "use strict";
 
-/** paintSetupFacts draws the plan of the host and the facts under it. */
 async function paintSetupFacts(doc) {
-  if (!setupState.hero) return;
   const facts = await setupFactList(doc);
-  const sentence = setupPlanSentence();
+  if (!setupState.hero || setupState.doc !== doc) return;
+  const summary = facts.filter((f) => ["gpus", "memory"].includes(f.id))
+    .map((f) => (f.label || f.id) + ": " + (f.value || "not reported")).join(" · ");
   put(setupState.hero,
-    h("div.setup-plan",
-      h("p", "bernie picked the setup that fits this host."),
-      h("p.small.muted", "Anything that needs a password is shown as a command to paste."),
-      sentence ? h("p.small.muted", sentence) : null),
-    facts.length ? h("dl.facts", facts.map(setupFact)) : null);
+    h("div.setup-plan", h("p", setupPlanSentence()),
+      summary ? h("p.small.muted", summary) : null,
+      h("p.small.muted", "Administrator commands need a terminal. Other setup steps run here, only when you start them.")),
+    facts.length ? h("details.advanced.setup-host-details", h("summary", "Host details and prerequisites"), h("dl.facts", facts.map(setupFact))) : null);
 }
 
-/** setupFactList is the facts of the host. The onboarding document carries
- *  them; the hardware and the doctor report fill them until it does. */
+/** Prefer onboarding's facts; probe hardware only when they are absent. */
 async function setupFactList(doc) {
   if (Array.isArray(doc.facts) && doc.facts.length) return doc.facts;
   const hw = await setupLoadHW();
@@ -24,15 +21,12 @@ async function setupFactList(doc) {
   return setupFactsFromHost(hw, doctor);
 }
 
-/** setupFact is one fact: its name, its value and the reason under it. */
 function setupFact(fact) {
   const row = factRow(fact.label || fact.id || "", fact.value, fact.why);
   row.classList.add("setup-fact");
   return row;
 }
 
-/** setupFactsFromHost reads the facts of the host from the hardware and the
- *  doctor report. */
 function setupFactsFromHost(hw, doctor) {
   const facts = [];
   if (hw) {
@@ -46,14 +40,11 @@ function setupFactsFromHost(hw, doctor) {
     const value = gpus.length
       ? Object.keys(names).map((name) => names[name] + " x " + name).join(", ")
       : "–";
-    let why = "No AMD GPU is visible to bernie.";
-    if (gpus.length === 1 && archs.length === 1) why = "one recipe family fits them all";
-    if (gpus.length > 1 && archs.length === 1) why = "every card is " + archs[0] + ", so one recipe family fits them all";
-    if (gpus.length && archs.length > 1) why = "the cards use " + archs.length + " architectures";
+    const why = gpus.length ? "GPU architectures: " + (archs.join(", ") || "not reported") : "No AMD GPU is visible to bernie.";
     facts.push({ id: "gpus", label: "GPUs", value: value, why: why });
 
     const ram = hw.host && hw.host.ram_bytes;
-    facts.push({ id: "memory", label: "Memory", value: ram ? bytes(ram) : "–", why: setupMemoryWhy(hw) });
+    facts.push({ id: "memory", label: "Host RAM", value: ram ? bytes(ram) : "–", why: setupMemoryWhy(hw) });
 
     const engines = (hw.host && hw.host.engines) || [];
     const usable = engines.filter((e) => e.usable);
@@ -62,7 +53,7 @@ function setupFactsFromHost(hw, doctor) {
       id: "engine",
       label: "Engine",
       value: engine ? (engine.name + (engine.version ? " " + engine.version : "")) : "–",
-      why: usable.length ? "the image is used" : "the server runs on the host",
+      why: setupState.mode === "container" ? (usable.length ? "Available for container mode." : "No usable container engine was reported.") : "Host mode runs directly on this machine; a container engine is optional.",
     });
   }
   if (doctor) {
@@ -86,29 +77,24 @@ function setupFactsFromHost(hw, doctor) {
   return facts;
 }
 
-/** setupMemoryWhy says what the memory of the host is used for. */
 function setupMemoryWhy(hw) {
   const gpus = (hw && hw.gpus) || [];
-  const vram = gpus.reduce((sum, gpu) => sum + (gpu.vram_bytes || 0), 0);
-  if (!vram) return "";
-  const perCard = Math.round(vram / gpus.length / (1024 * 1024 * 1024));
-  return perCard + " GiB per card, the rest is the KV cache";
+  if (!gpus.length) return "GPU capacity not reported; host RAM is separate from GPU VRAM.";
+  const capacities = gpus.map((g) => g.vram_bytes).filter((n) => Number.isFinite(n) && n > 0);
+  const low = Math.min(...capacities), high = Math.max(...capacities);
+  return "GPU VRAM: " + (capacities.length ? bytes(low) + (low === high ? "" : "–" + bytes(high)) + " per GPU" : "not reported")
+    + (capacities.length < gpus.length ? "; " + (gpus.length - capacities.length) + " GPU capacities unknown" : "")
+    + ". Separate from host RAM, not pooled.";
 }
 
-/** setupPlanSentence names the recipe that fits this host. */
 function setupPlanSentence() {
   const recipes = (setupState.recipes && setupState.recipes.recipes) || [];
-  const best = recipes.find((r) => r.fit && r.fit.status === "fits");
-  if (!best) return "";
-  const gpus = (setupState.hw && setupState.hw.gpus) || [];
-  const archs = Array.from(new Set(gpus.map((g) => g.gfx).filter(Boolean)));
-  let cards = "";
-  if (gpus.length && archs.length) cards = gpus.length + " cards of " + archs.join(", ");
-  else if (best.gpus) cards = best.gpus + " cards";
-  return "The recipe is " + (best.name || best.id) + (cards ? " with " + cards : "") + ".";
+  const selected = recipes.find((r) => r.id === setupState.recipeID);
+  if (!selected) return "Choose a recipe below to select the model and its serving settings.";
+  return "Selected recipe: " + (selected.name || selected.id) + ". "
+    + (setupState.mode === "container" ? "Run in a container on this host." : "Run directly on this host.");
 }
 
-/** setupLoadHW reads the hardware of the host once. */
 async function setupLoadHW() {
   if (setupState.hw) return setupState.hw;
   try {
@@ -119,7 +105,6 @@ async function setupLoadHW() {
   return setupState.hw;
 }
 
-/** setupLoadDoctorReport reads the doctor report once. */
 async function setupLoadDoctorReport() {
   if (setupState.doctor) return setupState.doctor;
   try {

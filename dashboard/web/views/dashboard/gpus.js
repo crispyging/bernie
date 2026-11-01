@@ -1,12 +1,8 @@
 "use strict";
-// ---------- Dashboard tiles and GPU cards ----------
-// One reusable tile and one card per AMD GPU on the host.
-//
+// Host-wide comparison and one selected-device inspector.
 // Adapted from vllm-rdna-dash by CrispyGinger, used with permission.
 
-// dashTile is one KPI tile: the name of the number, the number with its
-// unit, one line of context and the last minute of it. A number that was not
-// measured is a dash and a greyed unit, never a zero.
+// Missing measurements stay missing, never zero.
 function dashTile(spec) {
   const el = h("div.tile", { class: "dash-tile" });
   const label = h("div.tile-l", spec.label);
@@ -22,7 +18,7 @@ function dashTile(spec) {
   el.append(label, value, sub, sparkBox);
   el.update = (next) => {
     amount.textContent = next.value;
-    unit.textContent = next.unit || "";
+    unit.textContent = next.unit === undefined ? (spec.unit || "") : next.unit;
     unit.style.opacity = next.value === "–" ? ".55" : "1";
     sub.textContent = next.sub || "";
     chart.update(next.series || [], next.max);
@@ -30,132 +26,133 @@ function dashTile(spec) {
   return el;
 }
 
-// dashCard is the card of one GPU: its name, its state, the ring of its
-// load, the memory and the power meters, the temperatures, the clocks, the
-// ECC state and the last minute of its load.
-function dashCard(hip) {
-  const hw = ((dash.hw && dash.hw.gpus) || []).find((g) => g.hip_index === hip) || null;
-  const el = h("div.card", { class: "dash-card" });
-  const top = h("div.gpu-top", { class: "dash-card-top" });
-  const names = h("div", { class: "dash-min0" });
-  const name = h("h3", { class: "dash-card-name" }, dashCardName(hip));
-  const where = h("div.small-t", { class: "dash-card-where" }, (hw ? hw.pci : "") + (hw && hw.gfx ? " · " + hw.gfx : ""));
-  const state = h("span.dash-pill-wrap");
-  names.append(name, where);
-  top.append(names, state);
-  const mid = h("div.gpu-mid", { class: "dash-card-mid" });
-  const ringBox = ring(null, "GPU " + hip);
-  const stats = h("div.gpu-stats", { class: "dash-card-stats" });
-  const mem = meter(null, null, { label: "Memory", unit: "GiB", format: (v) => num(v / (1024 * 1024 * 1024)) });
-  const pow = meter(null, null, { label: "Power", unit: "W", sep: " of ", format: (v) => num(Math.round(v)) });
-  const temps = h("div.stat-row", { class: "dash-stat-row" });
-  const clocks = h("div.stat-row", { class: "dash-stat-row-center" });
-  const hot = h("div", { class: "dash-stat-hot" });
-  const age = h("div", { class: "small muted" });
-  stats.append(mem, pow, temps, hot, age, clocks);
-  mid.append(ringBox, stats);
-  const sparkBox = h("div.gpu-spark", { class: "dash-mt12" });
-  const chart = spark([], 100, "the load of GPU " + hip, { unit: "%" });
-  sparkBox.append(chart);
-  el.append(top, mid, sparkBox);
 
-  const pair = (label, value, cls) => h("span", { class: "dash-nowrap" },
-    h("span", { class: "dash-muted" }, label + " "),
-    h("b", { class: "dash-stat-value" + (cls ? " " + cls : "") }, value));
-
-  el.update = () => {
-    const sample = dash.tele ? (dash.tele.gpus || []).find((g) => g.hip_index === hip) : null;
-    const last = dash.samples[dash.samples.length - 1];
-    const card = last ? last.cards.find((c) => c.hip === hip) : null;
-    const limits = (hw && hw.temp_limits_c) || {};
-    const limit = limits.edge != null ? limits.edge : (hw && hw.power_cap_w ? null : null);
-    name.textContent = dashCardName(hip);
-    where.textContent = (hw ? hw.pci : "") + (hw && hw.gfx ? " · " + hw.gfx : "");
-    const run = dashLiveRun();
-    const inUse = !!run && run.state !== "exited";
-    state.replaceChildren(statePill(inUse ? "ok" : "skip", inUse ? "In use" : "Idle"));
-    ringBox.update(card ? card.busy : null);
-    mem.update(card ? card.mem : null, card ? card.total : null);
-    pow.update(card ? card.pow : null, card ? card.cap : null);
-    const t = card ? card.tmp : null;
-    const isHot = t != null && limit != null && t >= limit;
-    temps.replaceChildren(
-      pair("TEMP", t == null ? "–" : num(t) + " °C", isHot ? "dash-stat-serious" : ""),
-      pair("JUNCTION", card && card.jtmp != null ? num(card.jtmp) + " °C" : "–"),
-      pair("MEM", card && card.mtmp != null ? num(card.mtmp) + " °C" : "–"));
-    hot.textContent = isHot ? "hot: the limit of this card is " + limit + " °C" : "";
-    // The temperatures and the clocks are read every few seconds: the
-    // card says how old they are when they get older than twice their own
-    // interval.
-    const ageNote = slowAgeNote();
-    age.textContent = ageNote;
-    age.hidden = !ageNote;
-    const ecc = dashEcc(hip);
-    clocks.replaceChildren(
-      pair("SCLK", card && card.clk != null ? dashGroup(card.clk) + " MHz" : "–"),
-      pair("MCLK", card && card.mclk != null ? dashGroup(card.mclk) + " MHz" : "–"),
-      ecc.pill);
-    chart.update(dashCardSeries(hip, "busy"), 100);
-    if (sample && sample.hip_index === hip) { /* the sample is in the card list */ }
-  };
-  el.update();
-  return el;
-}
-
-// dashEcc is the ECC state of a card: the check of the doctor whose id is
-// gpu.ecc.<hip index>.
+// Keep memory-health warnings visible outside the technical disclosure.
 function dashEcc(hip) {
   const checks = (dash.doctor && dash.doctor.checks) || [];
   const c = checks.find((x) => x.id === "gpu.ecc." + hip);
-  if (!c) {
-    return { pill: statePill("skip", "unknown"), note: "The doctor has not checked the ECC counters yet." };
-  }
+  if (!c) return { kind: "skip", note: "GPU memory health has not been checked." };
   const kind = c.status === "ok" ? "ok" : c.status === "warn" ? "warn" : c.status === "fail" ? "fail" : "skip";
-  return { pill: statePill(kind, c.status === "skip" ? "unknown" : c.status), note: c.detail || "" };
+  return { kind: kind, note: c.detail || c.status };
 }
 
-// dashCards is the section with one card per card of the host.
-function dashCards(section) {
-  const grid = h("div", { class: "dash-cards" });
-  const note = h("div", { class: "dash-cards-note" });
-  section.append(note, grid);
-  let built = [];
-  const build = () => {
-    const hw = (dash.hw && dash.hw.gpus) || [];
-    const tele = (dash.tele && dash.tele.gpus) || [];
-    const hips = hw.length ? hw.map((g) => g.hip_index) : tele.map((g) => g.hip_index);
-    if (hips.length === built.length && hips.every((v, i) => v === built[i])) return false;
-    built = hips;
-    grid.replaceChildren();
-    for (const hip of hips) grid.append(dashCard(hip));
-    return true;
+function dashGPUOverview(section) {
+  const scope = h("p.dash-gpu-scope");
+  const plan = h("p.dash-gpu-scope");
+  const restriction = h("span");
+  const note = h("p.dash-gpu-scope", "Host-wide readings · other workloads may contribute. ", restriction);
+  const title = h("summary", "GPU inspector · choose Inspect in the comparison");
+  const status = h("p.dash-gpu-scope", { "aria-live": "polite" });
+  const health = h("p.dash-gpu-scope");
+  const facts = h("dl.dash-gpu-facts");
+  const labels = ["Architecture", "PCI address", "PCIe link", "Shader clock", "Memory clock", "Junction temperature", "Memory temperature"];
+  const values = labels.map((label) => {
+    const value = h("dd");
+    facts.append(h("div", h("dt", label), value));
+    return value;
+  });
+  const history = spark([], 100, "Selected GPU activity, host-wide", { unit: "%" });
+  const fields = h("div.dash-gpu-fields", facts, health,
+    h("h3", "Activity history · last 60 samples"), history);
+  const inspector = h("details.dash-gpu-inspector", { id: "dashboard-gpu-inspector" }, title, status, fields);
+  const histories = new Map();
+  let first = true, initialized = false, lastDocument = null, lost = "", freshness = {};
+  const inspect = () => {
+    const selected = table.selected();
+    fields.hidden = !selected;
+    const message = selected ? selected.note : lost || "Select a GPU above for its exact readings and activity history.";
+    if (status.textContent !== message) status.textContent = message;
+    if (!selected) {
+      title.textContent = "GPU inspector · choose Inspect in the comparison";
+      return;
+    }
+    title.textContent = "GPU " + selected.hip + " · " + (selected.hw.name || selected.hw.gfx || "Model unknown");
+    const ecc = dashEcc(selected.hip);
+    health.textContent = "Memory check: " + ecc.note;
+    health.classList.toggle("gpu-critical", ecc.kind === "warn" || ecc.kind === "fail");
+    const hw = selected.hw, sample = freshness.stale ? null : selected.sample;
+    const reading = (name, unit) => sample && Number.isFinite(sample[name]) ? num(sample[name]) + unit : "–";
+    const info = [hw.gfx || "Not reported", hw.pci || "Not reported",
+      hw.link && hw.link.gen > 0 && hw.link.width > 0 ? "Gen " + hw.link.gen + " ×" + hw.link.width : "Not reported",
+      reading("sclk_mhz", " MHz"), reading("mclk_mhz", " MHz"),
+      reading("temp_junction_c", " °C"), reading("temp_mem_c", " °C")];
+    values.forEach((node, i) => { if (node.textContent !== info[i]) node.textContent = info[i]; });
+    history.update(((histories.get(selected) || {}).values || []).slice(), 100);
   };
+  const table = gpuValueTable([], [], [], {
+    compact: true, controls: inspector.id,
+    onInspect: () => { lost = ""; inspector.open = true; inspect(); },
+  });
+  section.append(h("div.dash-gpu-heading", scope, h("a.btn.small", { href: "#topology" }, "GPU links")), plan, note, table.el, inspector);
   const api = {
     update: () => {
-      if (!build()) for (const c of grid.children) if (c.update) c.update();
-      const hips = built.length;
-      note.textContent = hips ? hips + (hips === 1 ? " card on this host." : " cards on this host.") : "No AMD GPU is visible to bernie.";
+      const doc = dash.tele;
+      const now = state.livePaused ? state.pauseStarted || Date.now() : Date.now();
+      const age = doc && doc.slow_age_s, interval = doc && doc.slow_interval_s;
+      freshness = {
+        stale: !!(doc && (doc.error || (doc.time && now - doc.time > STALE_MS))),
+        paused: !!state.livePaused,
+        inventoryKnown: !!(dash.hw && Array.isArray(dash.hw.gpus)),
+        slowNote: interval > 0 && age > 2 * interval ? "Temperature / cap / clocks " + Math.round(age) + " s old" : "",
+      };
+      const previous = table.selected();
+      table.update((dash.hw && dash.hw.gpus) || [], (doc && doc.gpus) || [],
+        (dash.doctor && dash.doctor.checks) || [], freshness);
+      const items = table.items();
+      table.el.hidden = !items.length;
+      if (previous && !table.selected()) lost = "Previously inspected GPU " + previous.hip
+        + (previous.hw.pci ? " (" + previous.hw.pci + ")" : "") + " changed or is no longer visible. Choose again.";
+      const changed = !!doc && doc !== lastDocument;
+      for (const r of items) {
+        let series = histories.get(r);
+        const seed = !series && first && dash.samples.length > 0;
+        if (!series || series.key !== r.key) {
+          series = { key: r.key, values: seed ? dash.samples.slice(-60).map((s) => {
+            const c = s.cards.find((g) => r.hw.pci ? (g.pci || "").toLowerCase() === r.hw.pci.toLowerCase() : g.hip === r.hip);
+            return c && Number.isFinite(c.busy) ? c.busy : null;
+          }) : [] };
+          histories.set(r, series);
+        }
+        if (changed && !seed) {
+          series.values.push(!freshness.stale && r.sample && Number.isFinite(r.sample.busy_pct) ? r.sample.busy_pct : null);
+          if (series.values.length > 60) series.values.shift();
+        }
+      }
+      for (const r of histories.keys()) if (!items.includes(r)) histories.delete(r);
+      if (items.length) first = false;
+      lastDocument = doc;
+      if (!initialized && items.length) {
+        initialized = true;
+        if (items.length === 1) { table.select(items[0].key); inspector.open = true; }
+      }
+      if (items.length) scope.textContent = items.length + (items.length === 1 ? " GPU" : " GPUs")
+        + (freshness.inventoryKnown ? " visible to bernie." : " reporting telemetry; serving visibility is unknown.");
+      else if (!dash.hw && !doc) scope.textContent = (dash.errors || {})["/api/hw"]
+        ? "GPU inventory unavailable: " + dash.errors["/api/hw"] : "Waiting for GPU data…";
+      else scope.textContent = "No GPUs are visible to bernie.";
+      const run = dashLiveRun();
+      const selected = run && !run.foreign && run.plan && Array.isArray(run.plan.gpus) ? run.plan.gpus : null;
+      plan.textContent = !run ? "Configured run plan: none."
+        : selected ? (run.state === "exited" ? "Last configured plan" : "Configured run plan") + " (" + run.name + "): "
+          + (selected.length ? selected.map((i) => "GPU " + i).join(", ") + " · " + selected.length + " selected." : "no GPUs listed.")
+          : (run.foreign ? "Attached server" : "Run plan") + " GPU selection: unknown.";
+      restriction.textContent = dash.hw && dash.hw.restriction ? " · " + dash.hw.restriction : "";
+      inspect();
     },
   };
   api.update();
   return api;
 }
 
-// renderGPUs subscribes to the shared stream through the onTabFrame seam.
-// The stream lives in js/data.js; this view opens no fetch and no timer of
-// its own. One stream, one frame per sample, for the whole page. A hidden
-// tab paints nothing: data.js pauses the poller and skips the frame.
 function renderGPUs() {
-  if (dash.live.simple) dash.live.simple.cards.update();
+  if (!state.livePaused && state.tele && state.tele !== dash.tele) dashSample(state.tele);
+  else dashUpdateSimple();
 }
 
-// dashSubscribe registers the repaint of this tab on the shared stream. The
-// stream lives in js/data.js; this view opens no fetch and no timer of its
-// own. One stream, one frame per sample. The subscription happens once: the
-// shell calls renderGPUs() on every sample and on a resize.
+// Subscribe once; renderGPUs may already have consumed this frame.
 function dashSubscribe() {
   if (dash.subscribed) return;
   dash.subscribed = true;
   if (typeof onTabFrame !== "function") return;
-  onTabFrame("dashboard", (doc) => { if (doc) dashSample(doc); });
+  onTabFrame("dashboard", (doc) => { if (!state.livePaused && doc && doc !== dash.tele) dashSample(doc); });
 }

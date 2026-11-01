@@ -166,7 +166,8 @@ and the series.
 
 The chart is an inline SVG, `overflow: visible`, with the grid lines in
 `--border`. A measure with no data draws an empty axis with the sentence
-`No samples yet.`. Data: the series of the history (G4) and the window.
+`No samples yet.`. Data: one numeric history series (G4) and the window;
+unmeasured points stay gaps. All current callers use this single-series form.
 
 The chart is built once: the grid, the two axes, the paths, the crosshair
 and the dot stay in the DOM. An update writes the path of a series and

@@ -1,6 +1,4 @@
-// bernie dashboard: the data layer.
-// One fetch helper, one state, one poller and the three streams of the
-// server. A view never opens a fetch or a timer of its own.
+// Shared requests, telemetry, frame dispatch and polling.
 "use strict";
 
 const HISTORY = 60; // seconds of sparkline history
@@ -11,6 +9,9 @@ const STALE_MS = 30000; // after this the numbers are old
 const state = {
   hw: null,          // /api/hw
   tele: null,        // the last telemetry event
+  livePaused: false,
+  pausedTele: null, // displayed snapshot while metric refresh is paused
+  pauseStarted: 0,
   hist: {},          // key -> number[] (the last HISTORY samples)
   tab: "setup",      // the tab that is open
   power: null,       // /api/power
@@ -249,9 +250,7 @@ function runFrameJobs() {
   }
 }
 
-/** onFrame batches the repaints of one sample into a single frame. A view
- *  hands its work to it; the page paints once. It is the only place that
- *  opens a requestAnimationFrame. */
+// Batch paint jobs; views do not own animation frames.
 function onFrame(fn) {
   frameJobs.add(fn);
   if (frameHandle) return;
@@ -260,9 +259,7 @@ function onFrame(fn) {
     if (frameFallback) { clearTimeout(frameFallback); frameFallback = 0; }
     runFrameJobs();
   });
-  // A page that is not painted (a tab in the background, a browser without a
-  // compositor) never runs its animation frames, and the numbers would never
-  // reach the reader. The fallback runs the same batch a moment later.
+  // Background pages may not paint; flush the same batch after a short delay.
   frameFallback = setTimeout(() => {
     frameFallback = 0;
     if (frameHandle) { cancelAnimationFrame(frameHandle); frameHandle = 0; }
@@ -274,11 +271,7 @@ function onFrame(fn) {
 
 const frameSubs = new Map();   // tab name -> the callbacks of that tab
 
-/** onTabFrame registers a repaint of one tab. The one shared stream calls
- *  the callbacks of the open tab after every sample, inside one frame. A
- *  view never opens a stream of its own: it registers here and the page
- *  keeps one connection to /api/telemetry. It returns a function that
- *  takes the callback back. */
+// Subscribe while this tab is active; return an unsubscribe function.
 function onTabFrame(tab, fn) {
   let set = frameSubs.get(tab);
   if (!set) { set = new Set(); frameSubs.set(tab, set); }
@@ -292,6 +285,29 @@ let telemetryStream = null;
 let pollTimer = null;
 let pollDelay = RUN_POLL_MS;
 let pollCycle = 0;
+
+function presentTelemetry() {
+  if (state.tab === "dashboard" && typeof renderGPUs === "function") renderGPUs();
+  if (state.livePaused) return;
+  const subs = frameSubs.get(state.tab);
+  if (subs && state.tele) for (const fn of subs) fn(state.tele);
+}
+
+function setLivePaused(paused) {
+  if (state.livePaused === paused) return;
+  if (paused) presentTelemetry();
+  state.livePaused = paused;
+  state.pausedTele = paused ? state.tele : null;
+  state.pauseStarted = paused ? Date.now() : 0;
+  const button = $("#liveToggle"), note = $("#livePauseNote");
+  button.textContent = paused ? "Resume live values" : "Pause live values";
+  button.setAttribute("aria-pressed", String(paused));
+  note.hidden = !paused;
+  note.textContent = "Live metric refresh paused" + (state.pausedTele && state.pausedTele.time
+    ? " at " + new Date(state.pausedTele.time).toLocaleTimeString() : " before the first reading")
+    + ". Serving continues; server health and controls stay live. Resume for current values.";
+  if (!paused) onFrame(presentTelemetry);
+}
 
 /** startTelemetry opens the live stream and keeps the history of the page. */
 function startTelemetry() {
@@ -327,11 +343,7 @@ function startTelemetry() {
       for (const r of t.runs || []) pushHist("gen:" + r.name, r.gen_tok_s);
       // A hidden tab paints nothing: the sample is kept, the repaint waits.
       if (document.hidden) return;
-      onFrame(() => {
-        if (state.tab === "dashboard" && typeof renderGPUs === "function") renderGPUs();
-        const subs = frameSubs.get(state.tab);
-        if (subs) for (const fn of subs) fn(t);
-      });
+      onFrame(presentTelemetry);
     },
   });
   return telemetryStream;

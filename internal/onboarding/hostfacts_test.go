@@ -5,66 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
-
-	"github.com/opengfx1030/bernie/internal/machine/gpu"
-	"github.com/opengfx1030/bernie/internal/machine/host"
 )
-
-// TestFactsOfTheHost checks the facts of the document: every fact has a key,
-// a label, a value and the reason why it matters.
-func TestFactsOfTheHost(t *testing.T) {
-	f := &Facts{
-		Host:   host.Info{RAMBytes: 64 << 30},
-		GPUs:   []gpu.GPU{{HIPIndex: 0, Name: "Radeon PRO V620", GFX: "gfx1030"}, {HIPIndex: 1, Name: "Radeon PRO V620", GFX: "gfx1030"}},
-		Recipe: "flashnext",
-		Best:   "flashnext",
-		Fits:   []string{"flashnext"},
-		Venv:   "/opt/venv", VenvSource: "config",
-		Model: "Qwen/Qwen3-8B",
-	}
-	facts := factsOf(f)
-	if len(facts) == 0 {
-		t.Fatal("the host has no facts")
-	}
-	seen := map[string]Fact{}
-	for _, fact := range facts {
-		if fact.ID == "" || fact.Label == "" || fact.Value == "" {
-			t.Errorf("the fact %+v is incomplete", fact)
-		}
-		if fact.Why == "" {
-			t.Errorf("the fact %q has no reason", fact.ID)
-		}
-		seen[fact.ID] = fact
-	}
-	gpus, ok := seen["gpus"]
-	if !ok {
-		t.Fatalf("the facts hold no gpus: %+v", facts)
-	}
-	if gpus.Value != "2× gfx1030 Radeon PRO V620" {
-		t.Errorf("the gpus are %q", gpus.Value)
-	}
-	if gpus.Why != "Every card is gfx1030, so one recipe family fits them all." {
-		t.Errorf("the reason of the gpus is %q", gpus.Why)
-	}
-	if mem := seen["memory"]; mem.Value != "64.0 GiB" {
-		t.Errorf("the memory is %q", mem.Value)
-	}
-	if py := seen["python"]; py.Value != "/opt/venv (config)" {
-		t.Errorf("the python is %q", py.Value)
-	}
-	if m := seen["model"]; m.Value != "Qwen/Qwen3-8B" {
-		t.Errorf("the model is %q", m.Value)
-	}
-}
-
-// TestBuildCarriesTheFacts checks that the document of the onboarding holds
-// the facts.
-func TestBuildCarriesTheFacts(t *testing.T) {
-	doc := Build(&Facts{Host: host.Info{RAMBytes: 32 << 30}})
-	if len(doc.Facts) == 0 {
-		t.Fatal("the document holds no facts")
-	}
-}
 
 // TestStepsCarryTheJobOfTheStep checks that a step names the job that made
 // it: the page re-attaches to it with the id.

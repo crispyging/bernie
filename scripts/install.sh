@@ -519,7 +519,7 @@ if [ "$start_after" = 1 ]; then
     if [ "$changed" = 1 ] || [ "$prev_version" = "" ]; then
         # A loopback listen is the safe default; warn for any other.
         case "$listen" in
-            127.0.0.1:*|[::1]*|localhost:*)
+            127.0.0.1:*|\[::1\]:*|localhost:*)
                 ;;
             *)
                 printf 'bernie: WARNING: %s is a non-loopback address; anyone with the URL can drive this host\n' "$listen"
@@ -527,12 +527,14 @@ if [ "$start_after" = 1 ]; then
                 ;;
         esac
         printf 'bernie: starting dashboard on %s ...\n' "$listen"
-        if ! "$bin_dir/bernie" dash start --listen "$listen" >/dev/null 2>&1; then
+        if "$bin_dir/bernie" dash start --listen "$listen" >/dev/null 2>&1; then
+            :
+        else
             rc=$?
-            printf 'bernie: dash start exited %d; the binary is installed, run `bernie dash start` to retry\n' "$rc"
+            printf "bernie: dash start exited %d; the binary is installed, run \`bernie dash start\` to retry\n" "$rc"
         fi
     else
-        printf 'bernie: version unchanged; dashboard left as-is (run `bernie dash status` to verify)\n'
+        printf "bernie: version unchanged; dashboard left as-is (run \`bernie dash status\` to verify)\n"
     fi
     printf 'bernie: dashboard status:\n'
     "$bin_dir/bernie" dash status || true

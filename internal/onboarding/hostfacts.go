@@ -31,9 +31,9 @@ func factsOf(f *Facts) []Fact {
 	if f.Host.RAMBytes > 0 {
 		out = append(out, Fact{
 			ID:    "memory",
-			Label: "Memory",
+			Label: "Host RAM",
 			Value: fmt.Sprintf("%.1f GiB", float64(f.Host.RAMBytes)/(1<<30)),
-			Why:   "The model has to fit in the memory next to the runtime of the server.",
+			Why:   "Host RAM is separate from GPU VRAM; GPU capacity is checked per selected card.",
 		})
 	}
 	if f.Recipe != "" {
@@ -81,10 +81,10 @@ func gpuWhy(f *Facts) string {
 	}
 	if len(unique) == 1 {
 		for a := range unique {
-			return fmt.Sprintf("Every card is %s, so one recipe family fits them all.", a)
+			return fmt.Sprintf("Every card reports %s; recipe compatibility also depends on each selected GPU's VRAM and host RAM.", a)
 		}
 	}
-	return "The cards are not all the same: the recipe has to fit the slowest one."
+	return "GPU architectures differ; check the architecture and VRAM of each selected GPU against the recipe."
 }
 
 // recipeWhy says why this recipe is the one to serve.

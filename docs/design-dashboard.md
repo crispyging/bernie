@@ -1,6 +1,6 @@
 # Dashboard v3 — the exact design
 
-Status: design spec, 2026-10-28. Nothing in this file is implemented yet.
+Status: operational dashboard. Usability revision: 2026-11-01.
 
 This file is the contract for the front-end workers. The behaviour of the
 product is [spec.md](spec.md); this file is the contract for the page.
@@ -18,6 +18,52 @@ type of the shipped page are the ones of [design/tokens.md](design/tokens.md):
 the drawings were made before the reference became the source of the palette,
 so a drawing and the page differ in colour and in the letterforms, never in
 the arrangement.
+
+## Current usability revision
+
+This amendment takes precedence over the original reference styling and tab
+names below. The palette and attribution stay; operational headings are now
+26–32 px on the Dashboard, non-italic Inter without offset shadows. Body and
+important comparison numbers are 16 px; secondary text is 14 px. Regular mode
+prioritizes next actions and warnings. Advanced exposes expert controls and
+technical metrics; neither mode hides Stop or makes missing status look healthy.
+
+The rail explicitly selects Regular or Advanced, separately from theme.
+The existing `bernie.advanced` preference is retained, with an in-memory
+fallback when storage fails. Disclosures keep their own state across ordinary
+updates and mode changes, including in-flight previews; modes do not expand JSON.
+GPU links retains `#topology`; Tools retains `#advanced`. Tools is grouped
+by Diagnose, Inspect, Change and Share, not by raw API resources.
+
+The Dashboard leads with vLLM model/server identity, health, recorded launch
+settings and the named engine's metrics, including KV-cache use in Regular.
+GPU activity and VRAM meters accompany exact readings in the shared comparison;
+small screens render those same rows as labeled per-device cards. The selected
+GPU inspector adds architecture, PCIe link, clocks and secondary temperatures
+without repeating the comparison. Stable keyed controls preserve selection
+and focus; removed or replaced devices require a new selection. Unknown or stale
+readings remain unknown, and ECC
+or thermal warnings remain visible in both modes. GPU links labels detected GPUs;
+inventory labels visibility, and the plan labels configured selection, not ownership.
+Per-GPU capacity never becomes an averaged or pooled capacity claim. A count of
+ten does not imply a model supports TP=10.
+
+Pause live values freezes shared metric presentation with a timestamped snapshot
+banner; serving, health and recovery controls continue. Resume uses the current
+sample on the existing stream. Browser smoke fixtures exercised all counts 1–10
+in both modes and themes at 1440, 1365, 390 and 320 px. Desktop comparison
+keeps 16 px readings and internal scrolling; mobile cards expose each reading
+without requiring sideways scrolling. Long names and warnings wrap.
+Coarse-pointer GPU inspection and mode controls retain 44 px hit targets; the
+shared touch override follows base button styles so the cascade cannot shrink them.
+
+Setup shows current phase, recorded elapsed time and latest available output;
+quiet builds have no invented percentage or estimate. Separate environment
+checks cannot overwrite installation outcomes. Dashboard uses the named
+server's metrics and distinguishes health readiness from metric availability.
+Chat explains its oldest-active-server selection. Connectivity, readiness
+and measured bandwidth are separate evidence on GPU links. Earlier wireframes
+and parity tables below describe the initial reference design, not these revisions.
 
 ## 1. Principles
 
@@ -108,7 +154,7 @@ entry, so the back button does not walk through them:
 | Old route | Opens | Lands on |
 |---|---|---|
 | `#home`, `#overview` | Setup | the headline |
-| `#gpus` | Dashboard | the per-GPU cards |
+| `#gpus` | Dashboard | the GPU comparison |
 | `#topology` | Dashboard | the topology section |
 | `#runs` | Dashboard | the run card |
 | `#recipes` | Setup | the recipe chooser |
@@ -146,10 +192,10 @@ sentence is always written out in the state headline of the tab.
   (`role="status"`): `The theme follows the system.` or `The theme is dark.`
   The palette is set before the first paint — `js/theme.js` is loaded in the
   head of the page — so the page never shows the other palette for a moment.
-- **Advanced.** The button opens or closes every Advanced panel of every tab
-  at once and stores the state (`bernie.advanced`). It has `aria-pressed`.
-  Each tab also has its own Advanced panel with its own toggle, so a tab can
-  be opened without the header.
+- **Interface mode.** Regular and Advanced are explicit segmented buttons,
+  each with `aria-pressed`. Regular is the default. Both retain manual
+  disclosures; switching mode changes capability visibility without forcing
+  evidence open or closed, and saves `bernie.advanced` when storage permits.
 
 ### 2.5 Toast, tooltip, copy
 
@@ -330,7 +376,7 @@ is.
 
 | # | Widget | What is missing | Proposal |
 |---|---|---|---|
-| G1 | The facts with their reasons on Setup | the onboarding document has no facts | add `facts` to the document of §3.3: `{"facts": [{"id": "gpus", "label": "GPUs", "value": "8 × Radeon PRO V620", "why": "Every card is gfx1030, so one recipe family fits them all."}]}`; the CLI prints the same array in `bernie status --steps`. The field is `id` and not `key`: every answer goes through `internal/support/redact`, and a member whose name ends in `key` names a secret, so the redactor would hide it |
+| G1 | The facts with their reasons on Setup | the onboarding document has no facts | add `facts` to the document of §3.3: `{"facts": [{"id": "gpus", "label": "GPUs", "value": "8 × Radeon PRO V620", "why": "Every card reports gfx1030; recipe compatibility also depends on each selected GPU's VRAM and host RAM."}]}`; the CLI prints the same array in `bernie status --steps`. The field is `id` and not `key`: every answer goes through `internal/support/redact`, and a member whose name ends in `key` names a secret, so the redactor would hide it |
 | G2 | The progress of the model download | the job document has no numbers | add `progress` to the job document: `{"progress": {"phase": "model.download", "bytes_done": 1800000000, "bytes_total": 2300000000, "rate_bps": 45200000, "files_done": 7, "files_total": 14, "eta_s": 11}}`; the existing `done`/`total` stay for the steps that count items. A number that is not measured is absent: the bytes, the rate and the time to finish are there for a download, the file counts are there when the step counts the files |
 | G3 | The "Try it" box on Setup and on the Dashboard | there is no endpoint for one prompt | new `POST /api/smoke`, body `{"prompt": "Hello", "run": "flashnext"}`: it calls the same `onboarding.Smoke` as `bernie smoke` with the prompt of the body, and answers `{"url": "http://127.0.0.1:8000", "model": "flash-next", "health": true, "reply": "…", "ttft_ms": 214, "output_tokens": 12, "tok_s": 56.1}`; `ttft_ms`, `output_tokens` and `tok_s` are new fields of `onboarding.SmokeResult`; the target is the running run or the one named by `run`, and a name that is not running is a 404 |
 | G4 | The history charts of the Dashboard | the telemetry stream holds one sample, no history | new `GET /api/gpus/history?window=15m`: `{"window": "15m", "interval_s": 2, "points": 450, "series": [{"hip_index": 0, "busy_pct": [0, 12, 30], "power_w": [11.2, 18.4, 22.0], "vram_used": [24117248, 24117248, 24117248], "tokens_per_s": [0, 0, 0]}]}`; the ring buffer holds one sample per GPU every 2 s for 30 minutes (900 points) in the hub; `window` is `5m`, `15m` or `1h`; `1h` is downsampled to one point per 15 s; the answer is at most 120 KB and is cached for 2 s; no series holds more than 240 points (a longer window is downsampled further: 15 m holds one point every 4 s, 1 h every 15 s); `tokens_per_s` is the output rate of the live run and `prompt_tok_s` is the prefill rate, both read from the hub's vLLM metrics sample; the rate is a property of the server, so every card carries the same number, and the fields are absent when no run serves; the hub samples the host only while a page watches `/api/telemetry`, so the buffer fills while the dashboard is open |
@@ -355,11 +401,11 @@ field in a domain struct changes `docs/spec.md` in the same commit.
 
 | Width | The rules |
 |---|---|
-| ≥ 1280 px | the rail is 220 px, the content is at most 1240 px, the hero is two columns, the KPI tiles are six across |
-| 960–1279 px | the tiles are four across, the GPU cards three |
-| 640–959 px | the rail is 200 px, the hero stacks, the columns are two |
-| ≤ 639 px | the rail becomes a bottom bar: the brand and the three buttons on the first row, the eight tabs in a grid of four columns and two rows under them; the tiles are two across, the charts and the GPU cards are full width, a table scrolls inside its card, the hero number is 40 px |
-| 390 px | the page never scrolls sideways; every tab of the bar is whole (89 × 44 px), no word is cut off; a table scrolls inside its card; nothing is hidden |
+| ≥ 1280 px | the rail is 220 px, the content is at most 1240 px, the hero is two columns, engine tiles are four across in Regular and six in Advanced |
+| 960–1279 px | KPI tiles wrap; GPU comparison remains one table with local scrolling |
+| 720–959 px | the rail is 200 px; secondary content wraps; table values retain their type size |
+| ≤ 719 px | the rail becomes a bottom bar with theme/mode and pause controls above the two-row tab grid; tiles are two across; charts stack and GPU rows become labeled cards |
+| 390 px | the page never scrolls sideways; every tab of the bar is whole; GPU readings remain visible in cards and other tables scroll locally |
 
 ### 8.2 Accessibility checklist
 
@@ -390,20 +436,23 @@ too, and it arrives when the reader asks for it.
 
 #### The first paint
 
+Measured from the embedded tree on 2026-11-01 by the four asset-budget tests;
+KB below means 1024 bytes. These are payload sizes, not page-load timings.
+
 | Budget | Target | Measured | Note |
 |---|---|---|---|
-| The whole page (HTML + CSS + JS, uncompressed) | ≤ 432 KB | **430.5 KB** (6.1 + 346.9 + 77.6) | the whole tree; the first paint is 154.6 KB of it |
-| HTML | ≤ 12 KB | **6.1 KB** | `index.html` |
-| CSS | ≤ 80 KB, in eight files | **77.6 KB** | the design said four files; the split is `components.css` (the shared) + `views.css` (the per-tab) + `bench.css` + `classic.css` + `logs.css` + `dashboard.css` |
-| JavaScript | ≤ 348 KB | **346.9 KB** | plain, hand-written and unminified; five tabs of it |
-| JavaScript on the first paint | ≤ 112 KB | **110.3 KB** | the shell + the Setup tab (the shared section/pill/empty-state helpers and the one-button path; the chooser and the path runner load on demand) |
-| CSS on the first paint | ≤ 40 KB | **38.2 KB** | `tokens.css`, `layout.css`, `components.css`, `views.css` |
+| The whole page (HTML + CSS + JS, uncompressed) | ≤ 432 KB | **429.0 KB** | the whole tree; the initial HTML/CSS/JS is unchanged |
+| HTML | ≤ 12 KB | **6.6 KB** | `index.html` |
+| CSS | ≤ 80 KB | **77.6 KB** | shared styles plus lazy tab styles; obsolete dashboard rules removed |
+| JavaScript | ≤ 348 KB | **344.8 KB** | plain and unminified; unused multi-series chart machinery removed |
+| JavaScript on the first paint | ≤ 112 KB | **103.0 KB** | the shell and Setup; chooser and path runner load on demand |
+| CSS on the first paint | ≤ 40 KB | **38.6 KB** | the five initial stylesheets |
 | Fonts | ≤ 130 KB, four woff2, OFL, `font-display: swap`, `unicode-range` | **128.4 KB**, four woff2, swap ✓, range ✓ | the license texts (24.5 KB) sit next to the files; they are not loaded by the page |
-| First-paint requests | ≤ 24 | **21** (1 HTML + 4 CSS + 12 scripts + 4 fonts) | the files of the other tabs come when their tab opens |
-| Transferred text on the first paint (gzip) | ≤ 60 KB | **46.4 KB** (HTML + CSS + JS, 32 %) | the gzipped HTML alone is 1.2 KB |
-| Text of the whole tree (gzip) | ≤ 149 KB | **148.2 KB** (33 %) | the five tabs of plain JavaScript; the Setup tab grew 1 KB gzipped for the 1 Hz ticker that keeps the elapsed time of a long install live (causal-conv1d, vllm) and for the storm-fix that broke an SSE replay loop |
+| First-paint requests | ≤ 24 | **22** (1 HTML + 5 CSS + 12 scripts + 4 fonts) | other tabs load on demand |
+| Transferred text on the first paint (gzip) | ≤ 60 KB | **47.8 KB** | initial HTML, CSS and JavaScript |
+| Text of the whole tree (gzip) | ≤ 149 KB | **149.0 KB** | 152561 bytes; existing budget retained, with little remaining headroom |
 | First paint on a loopback host | ≤ 1.0 s | **unmeasured** | the binary runs on this Mac; a measurement on the reference box (par1-cs25) lands in `dashboard/README.md` when the integrator pushes |
-| The live numbers | one stream: `GET /api/telemetry` at 1 Hz drives every tile, every ring, every meter and every sparkline | the stream | the poller pauses while `document.hidden` and reads once on return (`web/js/data.js`) |
+| The live numbers | one stream: `GET /api/telemetry` at 1 Hz drives metrics and charts | the stream | manual pause freezes metric presentation, not sampling or server health; hidden pages skip painting and pause polling |
 | The poller | one timer for the page, in `js/data.js`; no view opens its own timer | one timer | one `setTimeout` re-arms itself with a delay that grows on error (backoff, capped at 60 s) and shrinks on success |
 | The charts | the history is read once per window change and then appended from the telemetry stream; the view never re-reads it | the points are capped at 240 per chart (`web/components/charts.js`) | an update writes only the path `d`; the axes are built once |
 | The payload of the history | at most 120 KB for a 15-minute window; the ring buffer answers at most 900 points per GPU | the cap is 900 points (15 s × 60 s × 60 min × 2 s / 2) | the new `/api/gpus/history?window=…` (commit 6) honours it |

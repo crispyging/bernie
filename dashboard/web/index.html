@@ -30,10 +30,10 @@
       <a id="tab-dashboard" role="tab" href="#dashboard" data-tab="dashboard" aria-controls="panel-dashboard" aria-selected="false" tabindex="-1"><span class="ico" aria-hidden="true">▲</span>Dashboard<span class="tab-count" data-count="dashboard" hidden></span></a>
       <a id="tab-chat" role="tab" href="#chat" data-tab="chat" aria-controls="panel-chat" aria-selected="false" tabindex="-1"><span class="ico" aria-hidden="true">✉</span>Chat</a>
       <a id="tab-benchmark" role="tab" href="#benchmark" data-tab="benchmark" aria-controls="panel-benchmark" aria-selected="false" tabindex="-1"><span class="ico" aria-hidden="true">■</span>Benchmark</a>
-      <a id="tab-topology" role="tab" href="#topology" data-tab="topology" aria-controls="panel-topology" aria-selected="false" tabindex="-1"><span class="ico" aria-hidden="true">✚</span>Topology<span class="tab-count" data-count="topology" hidden></span></a>
+      <a id="tab-topology" role="tab" href="#topology" data-tab="topology" aria-controls="panel-topology" aria-selected="false" tabindex="-1"><span class="ico" aria-hidden="true">✚</span>GPU links<span class="tab-count" data-count="topology" hidden></span></a>
       <a id="tab-fleet" role="tab" href="#fleet" data-tab="fleet" aria-controls="panel-fleet" aria-selected="false" tabindex="-1"><span class="ico" aria-hidden="true">▦</span>Fleet</a>
       <a id="tab-logs" role="tab" href="#logs" data-tab="logs" aria-controls="panel-logs" aria-selected="false" tabindex="-1"><span class="ico" aria-hidden="true">≡</span>Logs</a>
-      <a id="tab-advanced" role="tab" href="#advanced" data-tab="advanced" aria-controls="panel-advanced" aria-selected="false" tabindex="-1"><span class="ico" aria-hidden="true">★</span>Advanced</a>
+      <a id="tab-advanced" role="tab" href="#advanced" data-tab="advanced" aria-controls="panel-advanced" aria-selected="false" tabindex="-1"><span class="ico" aria-hidden="true">★</span>Tools</a>
     </nav>
     <div class="rail-foot">
       <span id="runpill" class="pill skip" role="status" title="No run is serving on this host." aria-label="idle — No run is serving on this host."><span class="pill-icon">–</span><span class="pill-word">idle</span></span>
@@ -44,7 +44,15 @@
           <button type="button" data-theme-choice="dark" aria-pressed="false">Dark</button>
           <button type="button" data-theme-choice="light" aria-pressed="false">Light</button>
         </div>
-        <button id="advancedBtn" class="ghost small" type="button" aria-pressed="false" aria-label="Show the details of every tab" title="Show the technical detail inside every tab">Show details</button>
+        <div class="ui-mode">
+          <span class="small muted" id="modeLabel">Interface mode</span>
+          <div class="segmented-control" role="group" aria-labelledby="modeLabel" aria-describedby="modeHint">
+            <button type="button" data-ui-mode="regular" aria-pressed="true">Regular</button>
+            <button type="button" data-ui-mode="advanced" aria-pressed="false">Advanced</button>
+          </div>
+          <span class="small muted" id="modeHint">Guided actions and essential status.</span>
+        </div>
+        <button id="liveToggle" class="ghost small" type="button" aria-pressed="false" aria-describedby="livePauseNote">Pause live values</button>
         <button id="helpBtn" class="ghost small" type="button" aria-label="The keyboard shortcuts">?</button>
       </div>
       <span id="themeLive" class="sr-only" role="status" aria-live="polite"></span>
@@ -52,6 +60,7 @@
   </aside>
   <main id="main" class="content" tabindex="-1">
     <div id="demo-banner" class="banner warn" role="status" hidden><strong>Demo: nothing here is real.</strong> A captured host and a fake run: no GPU of this machine is used, and nothing outside the sandbox under the user cache is touched.</div>
+    <div id="livePauseNote" class="banner warn" role="status" hidden></div>
     <section id="panel-setup" class="panel" role="tabpanel" aria-labelledby="tab-setup" data-tab-panel="setup" hidden></section>
     <section id="panel-dashboard" class="panel" role="tabpanel" aria-labelledby="tab-dashboard" data-tab-panel="dashboard" hidden></section>
     <section id="panel-chat" class="panel" role="tabpanel" aria-labelledby="tab-chat" data-tab-panel="chat" hidden></section>

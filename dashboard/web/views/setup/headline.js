@@ -1,88 +1,52 @@
-// The headline of the Setup tab: the state of the host and the one next action.
-// Adapted from vllm-rdna-dash by CrispyGinger, used with permission.
+// Setup's one next action. Adapted from vllm-rdna-dash by CrispyGinger, with permission.
 "use strict";
 
-/** setupHeadline says what the machine is in one sentence, with the lede
- *  under it naming the single next action and who does it. */
 function setupHeadline(doc) {
-  const steps = doc.steps || [];
-  const path = steps.filter((s) => !SETUP_EXTRA_STEPS.includes(s.id));
+  const path = pathSteps(doc);
+  if (!path.length) return { title: "Setup checks are unavailable", lede: "No checklist was returned. Re-check the host before starting setup.", action: "refresh" };
   const pending = path.filter((s) => s.state !== "done" && s.state !== "skipped");
-  const runningStep = path.find((s) => s.state === "running");
-  // A setup run is not a row of the checklist; look at doc.path too.
-  const runningPath = !runningStep && doc.path && doc.path.state === "running" ? doc.path : null;
-  const running = runningStep || runningPath;
-  const hardware = steps.find((s) => s.id === "hardware");
-  const serve = steps.find((s) => s.id === "serve");
-  if (setupServerServing(serve)) {
-    return {
-      title: "THIS BOX IS SERVING.",
-      lede: "The model answers on " + setupServerEndpoint(serve) + ". Try it, or read the logs.",
-      action: "try",
-    };
+  const live = setupProgress.path;
+  const sameJob = live && doc.path && live.jobID === doc.path.id;
+  const runningPath = live && live.running || doc.path && doc.path.state === "running" && !(sameJob && live.finished);
+  const runningStep = path.find((s) => (s.job_state === "running" || s.state === "running" && !setupServerServing(s))
+    && !(setupProgress[s.id] && setupProgress[s.id].finished));
+  if (runningPath || runningStep || setupProgress.verify && setupProgress.verify.running) {
+    const checking = !runningPath && !runningStep;
+    return { title: checking ? "Checking the Python environment" : "Setup is in progress",
+      lede: checking ? "This checks installed components, not a rebuild or a server test." : "Follow the current step below. You can stop the running job at any time.",
+      action: "watch", step: runningPath || checking ? null : runningStep };
   }
-  if (running) {
-    const phase = (running.phase ||
-      (running.progress && running.progress.phase) ||
-      running.summary ||
-      "bernie is working on the next step.").trim();
-    // "watch" when the whole path runs: "Run the rest of the steps" would
-    // start a second run.
-    return { title: "SETTING UP THIS BOX.", lede: phase, action: runningPath ? "watch" : "continue" };
-  }
-  if (!pending.length) {
-    return {
-      title: "THIS BOX IS READY TO SERVE.",
-      lede: "Everything bernie needs is in place. Start the server and it answers on " + setupServerEndpoint(serve) + ".",
-      action: "start",
-    };
-  }
-  if (hardware && hardware.state === "blocked") {
-    return {
-      title: "THIS BOX HAS NO GPU FOR BERNIE.",
-      // The words of the state come from the step (internal/onboarding),
-      // so the page and `bernie status --steps` say the same thing.
-      lede: (hardware.summary || "This machine has no AMD GPU.") +
-        " Read the doctor report below to see what is missing.",
-      action: "doctor",
-    };
-  }
-  // A step can be blocked on the operator (a root command, a missing
-  // group, an unreadable /dev/kfd). The headline says so in words the
-  // reference's reader recognises (ia.md §5 R39): the situation, one
-  // short sentence, and the next move (Re-check).
+  const serve = path.find((s) => s.id === "serve");
+  if (setupServerServing(serve)) return {
+    title: "Your model is serving", lede: "The server answers on " + setupServerEndpoint(serve) + ". Try a question to check its response.", action: "try",
+  };
+  const failed = path.find((s) => s.state === "failed");
+  if (pending.length && (failed || live && live.failed || doc.path && doc.path.state === "failed")) return {
+    title: "Setup needs attention", lede: "The last attempt did not finish. Review its error and output, correct the cause, then retry.", action: "recover", step: failed,
+  };
+  const hardware = path.find((s) => s.id === "hardware");
+  if (hardware && hardware.state === "blocked") return {
+    title: "A compatible GPU is needed", lede: hardware.summary || "No compatible AMD GPU is visible. Read the host checks below.", action: "doctor",
+  };
   const blocked = pending.find((s) => s.state === "blocked");
-  if (blocked) {
-    const detail = blocked.summary || "a step waits for the operator.";
-    return {
-      title: "A FEW THINGS FIRST.",
-      lede: detail + " Fix the items below first, then press Re-check.",
-      action: "recheck",
-    };
-  }
+  if (blocked) return {
+    title: "A prerequisite needs your attention", lede: "Resolve the items in Needs you below, then re-check the host.", action: "recheck",
+  };
+  if (setupState.planError || setupState.recipeError || setupState.recipes && !(setupState.recipes.recipes || []).length) return {
+    title: "Review the recipe plan", lede: "The serving plan is not ready. Review the recipe message below before starting setup.", action: "recipe",
+  };
+  if (!pending.length) return {
+    title: "Ready to start the server", lede: "Setup checks are ready. Start the model server, then try a question.", action: "start",
+  };
   const current = setupCurrentStep(doc);
-  let lede = "";
-  const action = doc.next_action;
-  const primary = doc.primary;
-  if (primary && primary.sentence) {
-    // The sentence comes from the checklist (spec §3.3): the CLI, the MCP
-    // server and the page say the same thing.
-    lede = primary.sentence;
-  } else if (action && action.sentence) {
-    lede = action.sentence;
-  } else if (current && (current.root_commands || []).length) {
-    lede = "Copy the command, run it as root in a terminal, then press Re-check.";
-  } else {
-    lede = "The doctor report says what is missing.";
-  }
   return {
-    title: pending.length + (pending.length === 1 ? " STEP LEFT" : " STEPS LEFT") + " BEFORE THIS BOX CAN SERVE.",
-    lede: lede,
+    title: "Get this host ready to serve",
+    lede: doc.primary && doc.primary.sentence || doc.next_action && doc.next_action.sentence
+      || (current && (current.root_commands || []).length ? "Run the administrator commands below, then re-check the host." : "Check the prerequisites and choose a recipe below."),
     action: "setup",
   };
 }
 
-/** setupServerEndpoint is where the server answers. */
 function setupServerEndpoint(serve) {
   if (serve && serve.detail && /^https?:\/\//.test(serve.detail)) return serve.detail;
   const plan = setupState.plan;
@@ -90,128 +54,59 @@ function setupServerEndpoint(serve) {
   return "the port of the plan";
 }
 
-/** setupHeadActions are the actions of the tab. The filled button is the
- *  one primary action of the checklist (spec §3.3): it names what it does,
- *  never only "Run" or "Next". */
 function setupHeadActions(doc, say) {
-  const out = [];
+  const refresh = h("button", { type: "button", onclick: () => loadSetupDocument() }, "Re-check host");
+  const details = h("button.advanced-only", { type: "button", onclick: setupShowDetails }, "Technical details");
+  if (say.action === "refresh") { refresh.classList.add("primary"); return [refresh]; }
+  if (say.action === "doctor") return [h("button.primary", { type: "button", onclick: focusSetupDoctor }, "Read host checks"), refresh];
+  if (say.action === "recheck") return [h("button.primary", {
+    type: "button", onclick: () => { setupState.needsYou.scrollIntoView({ block: "center" }); },
+  }, "Review prerequisites"), refresh];
+  if (say.action === "recipe") return [h("button.primary", { type: "button", onclick: () => {
+    const section = document.getElementById("setup-recipes");
+    if (section) section.scrollIntoView({ block: "start" });
+  } }, "Review recipe plan"), refresh];
+  if (say.action === "watch" || say.action === "recover") return [h("button.primary", {
+    type: "button", onclick: () => {
+      if (say.step) { focusSetupStep(say.step.id); return; }
+      const box = setupState.pathBox;
+      const evidence = box && box.querySelector(".setup-run-details");
+      if (evidence && say.action === "recover") evidence.open = true;
+      if (box) box.scrollIntoView({ behavior: "smooth", block: "center" });
+    },
+  }, say.action === "recover" ? "Review setup failure" : "View current step"), refresh];
+  if (say.action === "try") return [h("button.primary", { type: "button", onclick: focusSetupVerify }, "Try a question"),
+    h("button", { type: "button", onclick: () => { location.hash = "#logs"; } }, "View server logs")];
+  if (say.action === "start") return [h("button.primary", { type: "button", onclick: startSetupServer }, "Start server"), details];
   const primary = doc.primary;
-  if (say.action === "doctor") {
-    out.push(h("button.primary", { type: "button", onclick: focusSetupDoctor }, "Read the doctor report"));
-    out.push(h("button", { type: "button", onclick: setupShowDetails }, "Show details"));
-    return out;
-  }
-  if (say.action === "recheck") {
-    out.push(h("button.primary", {
-      type: "button",
-      onclick: () => { focusSetupStep("setup-doctor"); loadSetupDocument(); },
-    }, "Re-check"));
-    out.push(h("button", { type: "button", onclick: setupShowDetails }, "Show details"));
-    return out;
-  }
-  if (say.action === "continue") {
-    out.push(h("button.primary", { type: "button", onclick: setupRunNextStep }, "Run the rest of the steps"));
-    out.push(h("button", { type: "button", onclick: () => loadSetupDocument() }, "Re-check"));
-    return out;
-  }
-  if (say.action === "watch") {
-    // The path is running: the button brings the reader to the live
-    // progress instead of starting a second run.
-    out.push(h("button.primary", {
-      type: "button",
-      onclick: () => {
-        if (setupState.pathBox) setupState.pathBox.scrollIntoView({ behavior: "smooth", block: "center" });
-      },
-    }, "Watch the setup"));
-    out.push(h("button", { type: "button", onclick: () => loadSetupDocument() }, "Re-check"));
-    return out;
-  }
-  // The one action of the checklist: it does everything bernie can do on
-  // this host. The words come from the checklist, so the CLI, the MCP
-  // server and the page say the same thing.
-  if (primary && primary.kind === "setup") {
-    out.push(h("button.primary", { type: "button", onclick: setupStartPath }, primary.label || "Set up this box"));
-    out.push(h("button", { type: "button", onclick: setupCopyNextCommand }, "Copy the command"));
-    out.push(h("button", { type: "button", onclick: () => loadSetupDocument() }, "Re-check"));
-    out.push(h("button", { type: "button", onclick: setupShowDetails }, "Show details"));
-    return out;
-  }
-  if (say.action === "start") {
-    out.push(h("button.primary", { type: "button", onclick: startSetupServer }, "Start the server"));
-    out.push(h("button", { type: "button", onclick: setupShowDetails }, "Show details"));
-    return out;
-  }
-  if (say.action === "try") {
-    out.push(h("button.primary", { type: "button", onclick: focusSetupVerify }, "Try it"));
-    out.push(h("button", { type: "button", onclick: () => { location.hash = "#logs"; } }, "Read the logs"));
-    return out;
-  }
+  if (primary && primary.kind === "setup") return [h("button.primary", {
+    type: "button", disabled: !setupState.recipeID || !!setupState.planLoading, onclick: setupStartPath,
+  }, !setupState.recipeID ? "Loading recipe…" : primary.label || "Set up this host"), refresh,
+  h("button.advanced-only", { type: "button", onclick: setupCopyNextCommand }, "Copy setup command"), details];
   const current = setupCurrentStep(doc);
-  const next = current && current.can_run ? current : null;
-  const rootNext = !next && current && (current.root_commands || []).length ? current : null;
-  if (next) {
-    out.push(h("button.primary", {
-      type: "button",
-      onclick: () => setupStartStep(next, { onRefresh: () => loadSetupDocument() }),
-    }, stepActionLabel(next, false)));
-  } else if (rootNext) {
-    out.push(h("button.primary", {
-      type: "button",
-      onclick: () => { setupCopyText(setupRootCommand(rootNext)); focusSetupStep(rootNext.id); },
-    }, "Copy the root command"));
-    out.push(h("button", { type: "button", onclick: setupCopyNextCommand }, "Copy the next command"));
-    out.push(h("button", { type: "button", onclick: () => loadSetupDocument() }, "Re-check"));
-    out.push(h("button", { type: "button", onclick: setupShowDetails }, "Show details"));
-    return out;
-  } else {
-    out.push(h("button.primary", { type: "button", onclick: focusSetupDoctor }, "Read the doctor report"));
-    out.push(h("button", { type: "button", onclick: setupShowDetails }, "Show details"));
-    return out;
-  }
-  out.push(h("button", { type: "button", onclick: setupCopyNextCommand }, "Copy the command"));
-  out.push(h("button", { type: "button", onclick: setupShowDetails }, "Show details"));
-  return out;
+  if (current && current.can_run) return [h("button.primary", {
+    type: "button", onclick: () => setupStartStep(current, { onRefresh: () => loadSetupDocument() }),
+  }, stepActionLabel(current, false)), details];
+  if (current && (current.root_commands || []).length) return [h("button.primary", {
+    type: "button", onclick: () => { setupCopyText(setupRootCommand(current)); focusSetupStep(current.id); },
+  }, "Copy administrator command"), refresh, details];
+  return [h("button.primary", { type: "button", onclick: focusSetupDoctor }, "Read host checks"), details];
 }
 
-/** setupNextRunnable is the next step bernie can do itself. */
-function setupNextRunnable(doc) {
-  const steps = (doc && doc.steps) || [];
-  const path = steps.filter((s) => !SETUP_EXTRA_STEPS.includes(s.id));
-  return path.find((s) => s.state === "todo" && s.can_run) || null;
-}
-
-/** setupCurrentStep is the step the reader does next: the one that runs,
- *  the one the checklist names, or the first step of the path that is not
- *  done yet. The headline and the timeline mark the same step. */
 function setupCurrentStep(doc) {
   const path = pathSteps(doc);
-  const running = path.find((s) => s.state === "running");
-  if (running) return running;
-  const named = path.find((s) => s.id === (doc && doc.next));
-  if (named) return named;
-  return path.find((s) => s.state !== "done" && s.state !== "skipped") || null;
+  return path.find((s) => (s.job_state === "running" || s.state === "running" && !setupServerServing(s)) && !(setupProgress[s.id] && setupProgress[s.id].finished))
+    || path.find((s) => s.state === "failed")
+    || path.find((s) => s.id === (doc && doc.next))
+    || path.find((s) => s.state !== "done" && s.state !== "skipped") || null;
 }
 
-/** setupRunNextStep starts the next step bernie can do. */
-function setupRunNextStep() {
-  const doc = setupState.doc;
-  const next = setupNextRunnable(doc);
-  if (!next) {
-    toast("There is no step bernie can do right now.");
-    return;
-  }
-  setupStartStep(next, { onRefresh: () => loadSetupDocument() });
-}
-
-/** setupStartStep starts one step of the checklist. The module of the
- *  steps comes with the press, so the first paint does not carry it. */
 function setupStartStep(step, options) {
   setupEnsureModule("views/setup/steps.js")
     .then(() => runSetupStep(step, options))
-    .catch(() => {});
+    .catch((e) => toast("The step could not start: " + (e.message || e)));
 }
 
-/** setupExplainWait says what a later step waits for. */
 function setupExplainWait(step) {
   const sentence = setupWaitSentence(step);
   if (!sentence) {
@@ -221,8 +116,7 @@ function setupExplainWait(step) {
   toast(sentence);
 }
 
-/** setupWaitSentence names the step that holds the path for a step that
- *  waits. The words come from the checklist (spec §3.3). */
+/** Name the prerequisite without making the reader decode an id. */
 function setupWaitSentence(step) {
   const doc = setupState.doc;
   if (!doc || !step || !step.waits_for) return "";
@@ -231,20 +125,16 @@ function setupWaitSentence(step) {
   return "This step waits for: " + stepActionLabel(holds, false) + ".";
 }
 
-/** pathSteps is the path of the checklist, with the extras removed. */
 function pathSteps(doc) {
   return (doc && doc.steps || []).filter((s) => !SETUP_EXTRA_STEPS.includes(s.id));
 }
 
-/** setupRootCommand is the command the operator runs as root for a step.
- *  It is the first root command of the step, never the doctor command:
- *  the button says "root command", so it has to be one. */
+/** Copy a root command, never a doctor command with a misleading label. */
 function setupRootCommand(step) {
   const roots = (step && step.root_commands) || [];
   return roots.length ? roots[0] : ((step && step.command) || "");
 }
 
-/** setupCopyNextCommand copies the command of the next step. */
 function setupCopyNextCommand() {
   const doc = setupState.doc;
   const next = doc && (doc.steps || []).find((s) => s.id === doc.next);
@@ -256,7 +146,6 @@ function setupCopyNextCommand() {
   setupCopyText(text);
 }
 
-/** setupCopyText puts a command on the clipboard and says that it worked. */
 async function setupCopyText(text) {
   if (!text) {
     toast("There is nothing to copy.");
@@ -272,8 +161,6 @@ async function setupCopyText(text) {
   if (!ok) {
     try {
       const area = h("textarea");
-      // The styles are set through the CSSOM, never as an inline style
-      // attribute: the page may not carry inline styles.
       area.style.position = "fixed";
       area.style.left = "-9999px";
       area.style.top = "0";
@@ -287,7 +174,6 @@ async function setupCopyText(text) {
   toast(ok ? "Copied the command." : "Copy failed: select the text and press Ctrl-C.", ok);
 }
 
-/** startSetupServer starts the server of the path. */
 function startSetupServer() {
   const doc = setupState.doc;
   const serve = doc && (doc.steps || []).find((s) => s.id === "serve");
@@ -298,18 +184,17 @@ function startSetupServer() {
   startSetupRecipe();
 }
 
-/** focusSetupStep scrolls to a step and puts the focus on its first
- *  control. */
 function focusSetupStep(id) {
-  if (!id) return;
-  const row = document.querySelector('[data-step="' + id + '"]');
+  const row = Array.from(document.querySelectorAll(".step-row")).find((el) => el.dataset.step === id);
   if (!row) return;
+  for (let el = row.parentElement; el; el = el.parentElement) {
+    if (el.tagName === "DETAILS") el.open = true;
+  }
   row.scrollIntoView({ block: "center" });
-  const control = row.querySelector("button, a, input");
+  const control = Array.from(row.querySelectorAll("button, a, input, summary")).find((el) => el.getClientRects().length);
   if (control) control.focus();
 }
 
-/** focusSetupDoctor scrolls to the doctor report. */
 function focusSetupDoctor() {
   const section = document.getElementById("setup-doctor");
   if (!section) return;
@@ -318,13 +203,11 @@ function focusSetupDoctor() {
   if (control) control.focus();
 }
 
-/** focusSetupVerify scrolls to the verify step. */
 function focusSetupVerify() {
   focusSetupStep("verify");
 }
 
-/** setupShowDetails opens or closes the raw documents of the tab. It acts on
- *  this tab only: the rail button is the page-wide switch. */
+/** Open this tab's raw documents without changing the page-wide mode. */
 async function setupShowDetails() {
   await setupEnsureModule("views/setup/advanced.js");
   let panel = setupState.advanced;
@@ -333,8 +216,7 @@ async function setupShowDetails() {
     setupState.advanced = panel;
     if (setupState.advancedBox) put(setupState.advancedBox, panel);
   }
-  setupState.detailsOpen = !setupState.detailsOpen;
-  panel.open = !!setupState.detailsOpen;
-  panel.dataset.local = "1";
-  if (panel.open) panel.scrollIntoView({ block: "nearest" });
+  setupState.detailsOpen = true;
+  panel.open = true;
+  panel.scrollIntoView({ block: "nearest" });
 }

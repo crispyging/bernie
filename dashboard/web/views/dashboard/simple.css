@@ -1,13 +1,12 @@
-/* The Dashboard tab in SIMPLE mode: the operational reading order of the
-   Classic reference, drawn with bernie's own components. The colours are
-   tokens; this file writes no colour of its own. */
+/* Engine overview and live metrics, using the shared theme tokens. */
 
 .dash-simple-hero {
-  margin: 0 0 24px;
-  padding: 24px 26px;
+  margin: 0 0 20px;
+  padding: 24px;
   max-width: none;
   background: var(--surface);
   border: 1px solid var(--border);
+  border-top: 3px solid var(--key);
   border-radius: var(--radius-card);
 }
 
@@ -30,17 +29,20 @@
   display: flex;
   gap: 8px;
   align-items: center;
-  margin-left: auto;
+  margin: 0 0 16px;
+  flex-wrap: wrap;
 }
 
 .dash-simple-hero .display {
-  color: var(--key);
-  font-size: clamp(44px, 6vw, 72px);
+  font-size: clamp(25px, 2.5vw, 32px);
+  color: var(--text);
   margin-bottom: 8px;
+  overflow-wrap: anywhere;
 }
 
 .dash-simple-hero .lede {
-  margin-bottom: 14px;
+  margin: 8px 0 16px;
+  font-size: 14px;
 }
 
 .dash-simple-endpoint {
@@ -70,7 +72,7 @@
 }
 
 .dash-simple-speed .dash-hero-num {
-  font-size: clamp(48px, 6vw, 68px);
+  font-size: clamp(40px, 5vw, 52px);
 }
 
 .dash-simple-speed .dash-hero-spark {
@@ -78,13 +80,14 @@
 }
 
 .dash-simple-tiles {
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-bottom: 0;
 }
 
 .dash-simple-tiles .tile {
   display: flex;
   flex-direction: column;
-  min-height: 148px;
+  min-height: 142px;
 }
 
 .dash-simple-tiles .dash-tile-spark {
@@ -140,9 +143,15 @@ dl.dash-machine-facts {
   margin-top: 10px;
 }
 
+@media (min-width: 1101px) {
+  body[data-advanced="on"] .dash-simple-tiles {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+}
+
 @media (max-width: 1100px) {
   .dash-simple-tiles {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
@@ -168,6 +177,8 @@ dl.dash-machine-facts {
   }
 
   .dash-simple-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     width: 100%;
     margin-left: 0;
   }
@@ -175,11 +186,43 @@ dl.dash-machine-facts {
 
 @media (max-width: 420px) {
   .dash-simple-hero .display {
-    font-size: 42px;
+    font-size: 28px;
   }
 
   .dash-simple-tiles .tile {
     min-height: 142px;
     padding: 11px 12px;
   }
+}
+
+.dash-simple-top .eyebrow { margin: 0; color: var(--text-2); }
+.dash-engine-status { margin-left: auto; }
+.dash-engine-status .pill { padding: 4px 10px; background: var(--surface-2); }
+.dash-engine-identity { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 13px; }
+.dash-engine-identity > span + span::before { content: "·"; margin-right: 12px; }
+.dash-engine-config { border-top: 1px solid var(--border); margin-top: 20px; padding-top: 16px; }
+.dash-engine-source { margin: 0; color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
+.dash-engine-facts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin: 14px 0 0; }
+.dash-engine-facts > div { min-width: 0; }
+.dash-engine-facts dt { color: var(--muted); font-size: 13px; margin-bottom: 4px; }
+.dash-engine-facts dd { margin: 0; font-size: 15px; font-weight: 600; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.dash-simple-speed .dash-hero-num { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; white-space: normal; }
+.dash-simple-speed .dash-hero-unit { margin-left: 0; }
+#dashboard-engine { border-top: 0; padding-top: 0; margin-top: 20px; }
+.dash-simple-bottom { margin-top: 24px; }
+
+@media (max-width: 720px) {
+  .dash-engine-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .dash-simple-hero { padding: 18px; }
+  .dash-simple-hero-grid { gap: 12px; }
+  .dash-simple-hero-grid > .dash-min0 { display: contents; }
+  .dash-simple-hero-grid .dash-simple-top { order: 0; margin-bottom: 0; }
+  .dash-simple-hero-grid .display { order: 1; margin: 0; }
+  .dash-simple-hero-grid .dash-engine-identity { order: 2; }
+  .dash-simple-hero-grid .lede { order: 3; margin: 0; }
+  .dash-simple-speed { order: 4; padding: 12px 0; gap: 4px; }
+  .dash-simple-speed .dash-hero-spark { display: none; }
+  .dash-simple-hero-grid .dash-simple-actions { order: 5; margin: 0; }
+  .dash-simple-hero-grid .dash-simple-endpoint { order: 6; }
+  .dash-simple-hero-grid .dash-min0 > .small { order: 7; margin: 0; }
 }

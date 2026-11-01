@@ -1,19 +1,10 @@
 "use strict";
-// ---------- Dashboard: Show details ----------
-// The disclosure at the end of the Dashboard tab: more about the same thing
-// on this tab. The documents are read when the reader opens the disclosure,
-// not when the tab opens.
-//
-// The per-GPU table is the one implementation of components/gputable.js: the
-// Advanced tab shows the same table.
-
-// The windows the history of the cards answers with.
+// Supplementary history and raw snapshots load only when requested.
 const DASH_DETAIL_WINDOWS = ["5m", "15m", "1h"];
 
-/** dashDetails is the disclosure at the end of the Dashboard tab. */
 function dashDetails() {
   const body = h("div.dash-details-body", loading());
-  const det = h("details.advanced.dash-details", h("summary", "Show details"), body);
+  const det = h("details.advanced.dash-details", h("summary", "Host history, power policy and raw snapshots"), body);
   let loaded = false;
   det.addEventListener("toggle", async () => {
     if (!det.open || loaded) return;
@@ -23,43 +14,28 @@ function dashDetails() {
   const view = {
     el: det,
     body: body,
-    table: null,
-    update: () => {
-      // The table follows the stream; the rest of the disclosure is read once.
-      if (!view.table) return;
-      view.table.update(
-        (dash.hw && dash.hw.gpus) || [],
-        (dash.tele && dash.tele.gpus) || [],
-        (dash.doctor && dash.doctor.checks) || []);
-    },
   };
   return view;
 }
 
-/** dashLoadDetails reads the documents of the disclosure and paints them. */
 async function dashLoadDetails(view) {
   const body = view.body;
   const power = await api("/api/power").catch(() => null);
   const docs = [];
   await dashDetailsRead(docs, "/api/telemetry", dash.tele);
   await dashDetailsRead(docs, "/api/hw", dash.hw);
-  await dashDetailsRead(docs, "/api/runs", dash.runs);
-  await dashDetailsRead(docs, "/api/gpus/history?window=5m");
-  const table = gpuValueTable(
-    (dash.hw && dash.hw.gpus) || [],
-    (dash.tele && dash.tele.gpus) || [],
-    (dash.doctor && dash.doctor.checks) || []);
-  view.table = table;
+  await dashDetailsRead(docs, "/api/runs", state.runs);
+  await dashDetailsRead(docs, "/api/gpus/history?window=5m", dash.historyOK ? dash.history : undefined);
   put(body,
-    h("div.card", cardHead("All GPU values", "/api/hw"), table.el),
     dashDetailsWindow(),
     dashDetailsPower(power),
     dashDetailsDocuments(docs));
 }
 
-/** dashDetailsRead adds one document of the disclosure. A failed read shows
- *  its message; the other documents still come. */
+// Failed reads remain independent of the other diagnostic documents.
 async function dashDetailsRead(entries, path, doc) {
+  const error = (dash.errors || {})[path];
+  if (error) { entries.push({ path: path, error: error }); return; }
   if (doc !== undefined) {
     entries.push({ path: path, doc: doc });
     return;
@@ -71,13 +47,12 @@ async function dashDetailsRead(entries, path, doc) {
   }
 }
 
-/** dashDetailsWindow is the window of the history: the reader picks it and
- *  the chart shows the load of the cards over that window. */
 function dashDetailsWindow() {
   const card = h("div.card");
   const seg = h("div.segmented-control", { role: "group", "aria-label": "The window of the history" });
   const note = h("p.small.muted");
-  const chart = areaChart([], { title: "The load of the cards", unit: "%", windowMinutes: 5 });
+  const chart = areaChart([], { title: "Average GPU activity", unit: "%", windowMinutes: 5,
+    hint: "Load history needs measured GPU samples; missing readings stay gaps." });
   let win = "5m";
   const buttons = {};
   for (const w of DASH_DETAIL_WINDOWS) {
@@ -109,25 +84,22 @@ function dashDetailsWindow() {
     }
     const minutes = dashWindowMinutes(win);
     chart.update(mean, minutes);
-    put(note, "Last " + ((doc && doc.window) || win) + ", one point every "
-      + ((doc && doc.interval_s) || "–") + " s, " + ((doc && doc.points) || n) + " points. "
-      + "The mean load of the cards.");
+    put(note, mean.some((v) => v != null)
+      ? "Last " + ((doc && doc.window) || win) + ", sampled every " + ((doc && doc.interval_s) || "–") + " s. Average activity across GPUs."
+      : "No GPU activity readings are available for this window. Check Setup if no GPU is visible.");
   };
-  put(card, cardHead("The history window", "/api/gpus/history"), seg, note, chart);
+  put(card, cardHead("GPU activity history", "/api/gpus/history"), seg, note, chart);
   paint();
   return card;
 }
 
-/** dashWindowMinutes is the number of minutes of a window of the history. */
 function dashWindowMinutes(win) {
   if (win === "1h") return 60;
   if (win === "15m") return 15;
   return 5;
 }
 
-/** dashDetailsPower is the read-out of the power caps: the cap of every card
- *  and the range the service allows. The write lives on the Advanced tab:
- *  this is the reader's view of the host. */
+// Read-only power limits; changes remain on the Advanced tab.
 function dashDetailsPower(power) {
   const card = h("div.card");
   if (!power) {
@@ -142,7 +114,7 @@ function dashDetailsPower(power) {
     h("td.num", Math.round(g.cap_w) + " W"),
     h("td.num", Math.round(g.min_w || 1) + "–" + Math.round(g.max_w || g.cap_w || 1) + " W"),
     h("td.num", g.desired_w == null ? "–" : Math.round(g.desired_w) + " W"),
-    h("td", g.drift ? h("span.badge.b-warn", "drift") : h("span.badge.b-ok", "in sync"))));
+    h("td", g.drift ? h("span.badge.b-warn", "changed outside bernie") : h("span.badge.b-ok", "in sync"))));
   put(card,
     cardHead("The power caps", "/api/power",
       power.installed ? null : h("span.badge.b-warn", "not installed")),
@@ -157,20 +129,15 @@ function dashDetailsPower(power) {
   return card;
 }
 
-/** dashDetailsDocuments are the raw documents behind the tab. */
 function dashDetailsDocuments(entries) {
   return h("div.dash-details-documents",
-    h("p.small.muted", "The documents behind this tab. An agent reads the same ones from the API."),
+    h("p.small.muted", "Snapshots captured when this panel opens; they do not update live."),
     entries.map((entry) => {
-      const text = entry.error
-        ? JSON.stringify({ error: entry.error }, null, 2)
+      const text = entry.error ? entry.error : entry.doc == null ? "No document has arrived yet."
         : JSON.stringify(entry.doc, null, 2);
-      return h("div.dash-details-document",
-        h("div.dash-details-head",
-          h("span.dash-details-path", entry.path),
-          h("span.grow"),
-          jsonLink(entry.path),
-          copyBtn(text, "Copy the JSON of " + entry.path)),
+      return h("details.dash-details-document",
+        h("summary", entry.path, entry.error ? " · unavailable" : entry.doc == null ? " · waiting for data" : ""),
+        h("div.dash-details-head", jsonLink(entry.path), copyBtn(text, "Copy " + entry.path)),
         h("pre.dash-details-json", text));
     }));
 }

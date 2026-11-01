@@ -355,7 +355,7 @@ above the steps, each with the reason why it matters.
 
 ```json
 {"id": "gpus", "label": "GPUs", "value": "8× gfx1030 Radeon PRO V620",
- "why": "Every card is gfx1030, so one recipe family fits them all."}
+ "why": "Every card reports gfx1030; recipe compatibility also depends on each selected GPU's VRAM and host RAM."}
 ```
 
 `bernie status --steps` prints the same array. The name of the fact is `id`
@@ -1099,12 +1099,22 @@ why:                            # optional; one short reason per setting
 
 When the plan has no `HIP_VISIBLE_DEVICES`, bernie selects GPUs:
 
-1. Keep GPUs whose arch matches `requires.arch`.
-2. Need `requires.gpus` of them, else the recipe does not fit.
-3. Prefer a set that shares one PCIe switch (`PIX`), then the lowest HIP
-   indices.
+1. Keep GPUs whose arch matches `requires.arch` and whose reported capacity meets
+   `requires.vram_gib` per GPU. An unreported capacity cannot satisfy a positive
+   VRAM requirement; capacities are not averaged or pooled.
+2. Need `requires.gpus` eligible GPUs, else the recipe does not fit.
+3. Among those eligible GPUs, prefer a set sharing one PCIe switch (`PIX`), then
+   the lowest HIP indices.
 
 `recipe plan` shows the selection and the reason.
+
+A recipe or `--set` explicit `HIP_VISIBLE_DEVICES` list is checked against known
+inventory for visibility, architecture and each selected GPU's VRAM. Insufficient
+or unreported required capacity is an error, even when another subset would fit.
+The existing GPU-count mismatch remains a warning. With unknown inventory, the
+existing unvalidated explicit-list / automatic-selection warning behavior remains.
+Inventory count is not an instruction to use that tensor-parallel size; the
+recipe must choose a model-supported layout.
 
 #### The visible GPUs
 
@@ -1126,6 +1136,12 @@ plan, `status`, `hw` and `doctor` all see the visible set only.
   it must name visible GPUs. A GPU outside the restriction is an error.
 - `status`, `hw` and `recipe plan` say in one line that a restriction is
   active: `GPUs limited to 8 by HIP_VISIBLE_DEVICES`.
+
+Topology discovery (`topo` / `/api/topo`) covers detected GPUs, including devices
+hidden from serving. The dashboard labels detected, visible and plan-selected
+scopes separately and retains host HIP numbering. Activity is host-wide, not a
+claim of exclusive ownership by a run. Single-GPU peer-copy readiness is not
+applicable, not a failed connectivity check.
 
 ### 7.8 Fit
 

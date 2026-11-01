@@ -281,8 +281,13 @@ function boot() {
     btn.addEventListener("click", () => setTheme(btn.dataset.themeChoice));
   }
   watchSystemTheme();
-  const advancedBtn = $("#advancedBtn");
-  if (advancedBtn) advancedBtn.addEventListener("click", toggleAdvanced);
+  for (const btn of document.querySelectorAll("[data-ui-mode]")) {
+    btn.addEventListener("click", () => {
+      if ((btn.dataset.uiMode === "advanced") !== advancedOn()) toggleAdvanced();
+    });
+  }
+  const liveToggle = $("#liveToggle");
+  if (liveToggle) liveToggle.addEventListener("click", () => setLivePaused(!state.livePaused));
   const helpBtn = $("#helpBtn");
   if (helpBtn) {
     helpBtn.addEventListener("click", () => {
@@ -298,11 +303,6 @@ function boot() {
   if (list) list.addEventListener("keydown", tabsKey);
   document.addEventListener("keydown", shortcutsKey);
 
-  // A panel that appears later follows the choice of the reader.
-  const main = document.querySelector("main");
-  if (main && window.MutationObserver) {
-    new MutationObserver(() => applyAdvancedToNew(advancedOn())).observe(main, { childList: true, subtree: true });
-  }
   window.addEventListener("hashchange", route);
   window.addEventListener("resize", () => state.tab === "dashboard" && typeof renderGPUs === "function" && renderGPUs());
 

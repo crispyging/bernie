@@ -239,18 +239,18 @@ type Handle struct {
 	done chan error
 }
 
-// Start serves the dashboard in the background and returns when it listens.
-// The URL to open goes to Options.Ready (the caller prints it). A bind error
-// comes back as an error and no dashboard runs then.
+// Start serves the dashboard in the background and returns when it listens
+// and Options.Ready has completed. A bind error comes back as an error and
+// no dashboard runs then.
 func Start(ctx context.Context, o Options) (*Handle, error) {
 	h := &Handle{done: make(chan error, 1)}
 	ready := make(chan string, 1)
 	caller := o.Ready
 	o.Ready = func(url string) {
-		ready <- url
 		if caller != nil {
 			caller(url)
 		}
+		ready <- url
 	}
 	go func() { h.done <- Serve(ctx, o) }()
 	select {
@@ -261,6 +261,7 @@ func Start(ctx context.Context, o Options) (*Handle, error) {
 		select {
 		case url := <-ready: // the server stopped right after it listened
 			h.url = url
+			h.done <- err // Wait must still observe the completed server.
 			return h, nil
 		default:
 		}

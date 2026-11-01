@@ -145,9 +145,9 @@ const SHORTCUTS = [
   ["g then s", "the Setup tab"],
   ["g then d", "the Dashboard tab"],
   ["g then b", "the Benchmark tab"],
-  ["g then t", "the Topology tab"],
+  ["g then t", "the GPU links tab"],
   ["g then l", "the Logs tab"],
-  ["g then c", "the Advanced tab"],
+  ["g then c", "the Tools tab"],
 ];
 
 /** shortcutsOn says whether the letter shortcuts are on. They are off until
@@ -186,41 +186,26 @@ function shortcutsText() {
 
 /* ---------- the advanced panels ---------- */
 
-/** advancedOn says whether the Advanced panels are open. */
+/** advancedOn reads the current mode, falling back to the saved preference. */
 function advancedOn() {
+  if (document.body.dataset.advanced) return document.body.dataset.advanced === "on";
   try { return localStorage.getItem(ADVANCED_KEY) === "1"; } catch (e) { return false; }
 }
 
-/** applyAdvanced opens or closes every disclosure of every tab. The rail
- *  button is the page-wide switch: it wins over a disclosure the reader
- *  opened by hand. */
+/** Interface mode exposes capabilities; disclosures keep their own state. */
 function applyAdvanced(on) {
   document.body.dataset.advanced = on ? "on" : "off";
-  const btn = $("#advancedBtn");
-  if (btn) {
-    btn.setAttribute("aria-pressed", String(!!on));
-    btn.setAttribute("aria-label", on ? "Hide the details of every tab" : "Show the details of every tab");
+  for (const btn of document.querySelectorAll("[data-ui-mode]")) {
+    btn.setAttribute("aria-pressed", String((btn.dataset.uiMode === "advanced") === !!on));
   }
-  for (const det of document.querySelectorAll("details.advanced")) {
-    det.dataset.local = "0";
-    det.open = !!on;
-  }
+  const hint = $("#modeHint");
+  if (hint) hint.textContent = on ? "Full controls, diagnostics and technical details." : "Guided actions and essential status.";
 }
 
-/** applyAdvancedToNew opens or closes the disclosures that follow the
- *  page-wide switch. A disclosure the reader opened by hand keeps its own
- *  state. */
-function applyAdvancedToNew(on) {
-  for (const det of document.querySelectorAll("details.advanced")) {
-    if (det.dataset.local === "1") continue;
-    det.open = !!on;
-  }
-}
 
-// A disclosure the reader opens by hand keeps its own state: the page-wide
-// switch leaves it alone until the reader uses the switch again.
+// Preserve reader-chosen disclosure state across serving-plan repaints.
 document.addEventListener("click", (ev) => {
-  const sum = ev.target && ev.target.closest ? ev.target.closest("details.advanced > summary") : null;
+  const sum = ev.target && ev.target.closest ? ev.target.closest(".recipe-plan details.advanced > summary") : null;
   if (sum && sum.parentElement) sum.parentElement.dataset.local = "1";
 });
 

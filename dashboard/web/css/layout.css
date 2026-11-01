@@ -1,13 +1,5 @@
-/* bernie dashboard: the layout.
-   Adapted from vllm-rdna-dash by CrispyGinger, used with permission.
-   The shell is a rail on the left and a content column on the right. The rail
-   holds the brand, the four tabs, the old tabs under "Classic" and the footer
-   with the run status, the theme button and the Advanced button.
-
-   The rules of the design: 220 px rail, a content column of at most 1240 px,
-   34 px of padding above and 80 px below, a section with a 1 px rule above it
-   and a column grid of at least 320 px. Under 720 px the rail becomes a tab
-   bar at the bottom of the page and the page never scrolls sideways. */
+/* Dashboard shell: side rail on desktop, bottom navigation on mobile.
+   Adapted from vllm-rdna-dash by CrispyGinger, used with permission. */
 
 body.shell {
   display: grid;
@@ -15,8 +7,9 @@ body.shell {
   min-height: 100vh;
 }
 
-/* A hidden element stays hidden. */
-[hidden] { display: none !important; }
+/* Modes change detail density, never access to essential actions. */
+[hidden], body:not([data-advanced="on"]) .advanced-only,
+body[data-advanced="on"] .regular-only { display: none !important; }
 
 /* ---------- the rail ---------- */
 
@@ -86,7 +79,7 @@ body.shell {
   padding: 9px 10px;
   border-radius: var(--radius-sm);
   border-left: 2px solid transparent;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--text-2);
   text-decoration: none;
@@ -168,6 +161,11 @@ body.shell {
 /* the theme control keeps its width: a control that shrinks cannot be read */
 .rail-buttons .segmented-control { flex: 0 0 auto; }
 
+.ui-mode { display: grid; gap: 6px; width: 100%; }
+.ui-mode .segmented-control { display: flex; }
+.ui-mode button { flex: 1; justify-content: center; }
+#modeHint { line-height: 1.45; }
+
 /* ---------- the skip link and the data age ---------- */
 
 .skip {
@@ -225,11 +223,11 @@ body.shell {
 }
 
 .state-head .display {
-  font: italic 900 var(--display)/.95 var(--font-display);
+  font: 750 var(--display)/1.18 var(--font-body);
   letter-spacing: -.025em;
-  text-transform: uppercase;
+  text-transform: none;
   margin: 0 0 var(--space-3);
-  text-shadow: var(--punch);
+  text-shadow: none;
   overflow-wrap: anywhere;
 }
 
@@ -264,9 +262,9 @@ body.shell {
 }
 
 .section-label {
-  font: 800 var(--section-label)/1.2 var(--font-display);
-  letter-spacing: .14em;
-  text-transform: uppercase;
+  font: 700 16px/1.4 var(--font-body);
+  letter-spacing: normal;
+  text-transform: none;
   color: var(--muted);
   margin: 0 0 var(--space-4);
 }
@@ -299,9 +297,9 @@ body.shell {
 .facts > div:last-child { border-right: 0; }
 
 .facts dt {
-  font: 800 var(--small)/1.2 var(--font-body);
-  letter-spacing: .08em;
-  text-transform: uppercase;
+  font: 600 var(--small)/1.4 var(--font-body);
+  letter-spacing: normal;
+  text-transform: none;
   color: var(--muted);
 }
 
@@ -343,13 +341,10 @@ body.shell {
 @media (max-width: 719px) {
   body.shell {
     grid-template-columns: minmax(0, 1fr);
-    padding-bottom: 150px;
+    padding-bottom: 240px;
   }
 
-  /* The rail becomes a tab bar at the bottom of the page: the thumb reaches
-     it and the content keeps its full width. The eight entries sit in a grid
-     of four columns and two rows: every word is whole, the bar never
-     scrolls sideways and every entry keeps a 44 px touch target. */
+  /* Two rows of tabs below a compact theme and mode control row. */
   .rail {
     position: fixed;
     left: 0;
@@ -359,10 +354,8 @@ body.shell {
     height: auto;
     z-index: 20;
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    grid-template-areas:
-      "brand foot"
-      "tabs tabs";
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "foot" "tabs";
     align-items: center;
     gap: var(--space-2);
     padding: 8px 12px;
@@ -372,13 +365,7 @@ body.shell {
     overflow: hidden;
   }
 
-  .brand {
-    grid-area: brand;
-    margin: 0;
-    flex: none;
-  }
-
-  .brand .host { display: none; }
+  .brand { display: none; }
 
   .tabs {
     grid-area: tabs;
@@ -424,10 +411,17 @@ body.shell {
   .rail-foot .pill,
   .rail-foot .pill-age { display: none; }
 
+  .ui-mode { width: auto; flex: 1; order: -1; }
+  #modeLabel, #modeHint { display: none; }
+  .rail-buttons { width: 100%; display: grid; grid-template-columns: minmax(0, 1fr) auto; }
+  .rail-buttons button { padding-inline: 7px; font-size: 12px; }
+  #liveToggle { justify-self: start; }
+  #helpBtn { justify-self: end; }
+
   .content {
     padding: var(--space-5) 16px var(--space-9);
   }
 
-  .state-head .display { font-size: 40px; }
+  .state-head .display { font-size: 28px; }
   .cols, .cols-2 { grid-template-columns: minmax(0, 1fr); }
 }

@@ -17,7 +17,7 @@ function logPill(kind, word) {
 /** logSeverityPill is the pill of a finding of the log doctor. */
 function logSeverityPill(finding) {
   const error = finding.severity === "error";
-  return logPill(error ? "fail" : "warn", error ? "fail" : "warn");
+  return logPill(error ? "fail" : "warn", error ? "Error" : "Warning");
 }
 
 /** logFixIsCommand says whether the fix of a finding is a command to run in
@@ -36,12 +36,12 @@ function logFinding(finding, options) {
   return h("div.finding.lg-finding", { class: fail ? "lg-sev-fail" : "lg-sev-warn" },
     h("div.lg-finding-head",
       logSeverityPill(finding),
-      h("span.lg-rule", finding.id || "rule"),
+      h("span.lg-rule.advanced-only", finding.id || "rule"),
       finding.line_no != null ? h("span.lg-line-no", "line " + finding.line_no) : null),
     h("p.lg-cause", finding.cause || ""),
     fix ? (logFixIsCommand(fix) ? cmdBlock(fix) : h("p.lg-fix", fix, " ", copyBtn(fix, "Copy the fix"))) : null,
     h("div.lg-finding-foot",
-      finding.doc ? h("a.lg-doc", { href: finding.doc, target: "_blank", rel: "noopener noreferrer" }, "Read the rule →") : null,
+      finding.doc ? h("a.lg-doc", { href: finding.doc, target: "_blank", rel: "noopener noreferrer" }, "Read the explanation") : null,
       o.onJump ? h("button", { type: "button", onclick: () => o.onJump(finding) }, "Go to the line") : null));
 }
 
@@ -50,8 +50,8 @@ function logFindings(matches, options) {
   const o = options || {};
   const list = matches || [];
   if (!list.length) {
-    return emptyState("No known failure in this log.",
-      "bernie knows the failures of this server; none of them is in this log.",
+    return emptyState("No recognized problems in this log.",
+      "This checks known patterns, not overall health. If the server is not working, inspect the log below.",
       "bernie doctor --run NAME");
   }
   return h("div.findings", list.map((f) => logFinding(f, o)));

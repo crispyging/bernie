@@ -1,129 +1,168 @@
 "use strict";
-// ---------- Dashboard: the simple operational view ----------
-// The SIMPLE view answers the question of the tab in the order a person
-// reads it: is it serving, how fast is it, what are the six serving
-// measures, what do the cards do, what machine is this and how does an app
-// connect? It uses the shared components of bernie and the one telemetry
-// stream; it opens no fetch, stream or timer of its own.
-//
-// The Advanced tab keeps bernie's diagnostic depth; this file owns only
-// the clear operational view of the Dashboard tab.
-
-/* ---------- the hero ---------- */
-
-/** dashSimpleHero is the first card of the Simple view: the state in one
- * word, one sentence, the endpoint and its copy button, the action and the
- * output speed with its unit. */
+// Engine identity, live performance and the host's GPU comparison.
 function dashSimpleHero() {
   const el = h("section.state-head.dash-simple-hero");
-  const grid = h("div.dash-simple-hero-grid");
   const left = h("div.dash-min0");
   const right = h("div.dash-simple-speed");
-  const top = h("div.dash-simple-top");
-  const pill = h("span");
   const layout = h("span.dash-muted");
-  const actions = h("div.dash-simple-actions");
-  const stop = h("button", { type: "button" }, "Stop");
-  const start = h("a.btn.primary", { href: "#setup" }, "Start a run");
-  stop.addEventListener("click", () => dashStopRun());
-  actions.append(stop, start);
-  const word = h("h1.display", { "aria-live": "polite" }, "NOT RUNNING");
-  const lede = h("p.lede", "The model server is not running.");
-  const endpoint = h("div.dash-simple-endpoint");
+  const technical = h("span.dash-muted");
+  const statusBadge = h("span.dash-engine-status", { role: "status" });
+  const config = dashEngineConfig();
+  let lastStatus = "";
+  const stop = h("button", { type: "button" }, "Stop server");
+  const start = h("a.btn.primary", { href: "#setup" }, "Start a model");
+  const chat = h("a.btn.primary", { href: "#chat" }, "Test in Chat");
+  const connect = h("a.btn", { href: "#dashboard/connect" }, "Connect an app");
+  const logs = h("a.btn", { href: "#logs" }, "Open Logs");
+  let shown = null;
+  stop.addEventListener("click", async () => {
+    stop.disabled = true;
+    try { await dashStopRun(shown); } finally { stop.disabled = false; }
+  });
+  const word = h("h1.display", "Reading model status");
+  const lede = h("p.lede");
+  const scope = h("p.small.muted");
+  const endpointLabel = h("span.dash-muted", "App base URL");
   const endpointCode = h("code");
-  const endpointCopy = copyBtn("", "Copy the endpoint URL");
-  const endpointNone = h("span.dash-muted", "No endpoint while no run is serving.");
-  endpoint.append(endpointCode, endpointCopy, endpointNone);
-  top.append(pill, layout, actions);
-  left.append(top, word, lede, endpoint,
-    h("p.small.muted", h("a", { href: "#topology" }, "P2P readiness: open the Topology tab")));
-  const eyebrow = h("div.eyebrow", "Output speed");
-  const value = h("div.dash-hero-num");
+  const endpointCopy = copyBtn("", "Copy the model API base URL");
+  const endpointNone = h("span.dash-muted");
+  const metricsNote = h("p.small.muted");
+  left.append(h("div.dash-simple-top", h("span.eyebrow", "vLLM engine"), statusBadge), word,
+    h("div.dash-engine-identity", layout, technical), lede,
+    h("div.dash-simple-actions", start, chat, connect, logs, stop), scope,
+    h("div.dash-simple-endpoint", endpointLabel, endpointCode, endpointCopy, endpointNone), metricsNote);
   const amount = h("span", "–");
-  const unit = h("small", { class: "dash-hero-unit" }, "tok/s");
-  value.append(amount, unit);
-  const note = h("div.dash-hero-note", "No run is serving.");
-  const sparkBox = h("div.dash-hero-spark");
-  const chart = spark([], null, "the output speed of the live run", { unit: "tok/s" });
-  sparkBox.append(chart);
-  right.append(eyebrow, value, note, sparkBox);
-  grid.append(left, right);
-  el.append(grid);
-
-  const api = {
+  const unit = h("small.dash-hero-unit", "tokens/s");
+  const note = h("div.dash-hero-note");
+  const chart = spark([], null, "Output speed of the shown server", { unit: "tok/s" });
+  right.append(h("div.eyebrow", "Output speed"), h("div.dash-hero-num", amount, unit),
+    note, h("div.dash-hero-spark", chart));
+  el.append(h("div.dash-simple-hero-grid", left, right), config.el);
+  const view = {
+    el: el,
     update: () => {
       const run = dashLiveRun();
-      const tele = dash.tele && (dash.tele.runs || []).find((r) => run && r.name === r.name);
-      const active = !!run && run.state !== "exited";
-      const serving = active && !!tele && !!tele.stats;
-      const starting = active && !serving;
-      const kind = serving ? "ok" : starting ? "running" : "skip";
-      const label = serving ? "Serving" : starting ? "Starting" : "No run";
-      pill.replaceChildren(statePill(kind, label));
-      layout.textContent = active
-        ? [run.name, run.mode || "host", run.port ? "port " + run.port : null].filter(Boolean).join(" · ")
-        : "no run on this host";
-      word.textContent = serving ? "SERVING" : starting ? "STARTING" : "NOT RUNNING";
-      lede.textContent = serving
-        ? (run.name || "The model") + " is answering requests on port " + (run.port || "–") + "."
-        : starting
-          ? (dashPhase(run) || "The server is loading the model.")
-          : "The model server is not running.";
-
-      const endpointInfo = connectEndpoint(active ? run : null);
-      endpointCode.textContent = endpointInfo.url;
-      endpointCode.hidden = !endpointInfo.url;
-      endpointCopy.setAttribute("data-copy", endpointInfo.url);
-      endpointCopy.hidden = !endpointInfo.url;
-      endpointNone.hidden = !!endpointInfo.url;
-      stop.hidden = !active;
-      start.hidden = active;
-
-      const gen = tele ? tele.gen_tok_s : null;
+      shown = run;
+      const status = dashRunStatus(run);
+      const tele = status.tele;
+      layout.textContent = run ? "Server · " + run.name : "No server on this host";
+      technical.textContent = run ? (run.foreign ? "Attached server" : run.mode === "container"
+        ? (run.engine || "Container") + " deployment" : run.mode === "host" ? "Host process" : "Deployment not recorded") : "";
+      const title = run ? (run.plan && (run.plan.served_name || run.plan.model)) || run.name : status.label;
+      if (word.textContent !== title) word.textContent = title;
+      const statusKey = status.kind + status.label;
+      if (lastStatus !== statusKey) {
+        put(statusBadge, statePill(status.kind, status.label));
+        lastStatus = statusKey;
+      }
+      el.dataset.state = status.kind;
+      lede.textContent = status.ready ? "OpenAI-compatible API · health check passed." : status.message;
+      config.update(run);
+      const live = state.tele || dash.tele;
+      const runs = !status.unknown && live && Array.isArray(live.runs) ? live.runs : runsOf(state.runs);
+      const active = runs.filter((r) => r.state !== "exited");
+      const ready = active.filter((r) => r.state === "running" && r.answering !== false).length;
+      scope.textContent = active.length > 1 ? active.length + " servers recorded as active. "
+        + (status.unknown ? "Live status is unavailable. " : ready + " ready, " + (active.length - ready) + " not ready. ")
+        + "Showing " + run.name + "; Chat also uses the first active server. Inspect other servers in Logs." : "";
+      scope.hidden = !scope.textContent;
+      const endpoint = connectEndpoint(status.active ? run : null);
+      endpointCode.textContent = endpoint.url;
+      endpointLabel.hidden = endpointCode.hidden = endpointCopy.hidden = !endpoint.url;
+      endpointCopy.setAttribute("data-copy", endpoint.url);
+      endpointNone.hidden = !!endpoint.url;
+      endpointNone.textContent = status.active ? "No model API address was reported." : "Start a model to get an app connection URL.";
+      stop.hidden = !status.active;
+      stop.textContent = run && run.foreign ? "Detach server" : "Stop server";
+      stop.title = status.active ? (run.foreign ? "Forget attached server " : "Stop ") + run.name : "";
+      start.hidden = status.active || status.unknown;
+      chat.hidden = !status.ready;
+      connect.hidden = !status.active;
+      logs.hidden = !run && !status.unknown;
+      metricsNote.textContent = tele && tele.error ? "Live metrics unavailable: " + tele.error
+        : status.ready && !(tele && tele.stats) ? "The server is ready, but live speed and request metrics are not available yet." : "";
+      metricsNote.hidden = !metricsNote.textContent;
+      const gen = status.ready && tele && tele.stats ? tele.gen_tok_s : null;
       amount.textContent = gen == null ? "–" : num(gen);
       unit.style.opacity = gen == null ? ".55" : "1";
-      const values = dashSeries("gen").filter((v) => v != null);
+      const series = dashSeries("gen");
+      const values = series.filter((v) => v != null);
       const avg = values.length ? values.reduce((a, b) => a + b, 0) / values.length : null;
-      note.textContent = gen == null
-        ? "No run is serving."
-        : avg == null ? "the live run" : "1-min avg " + num(avg) + " tok/s";
-      chart.update(dashSeries("gen"));
+      note.textContent = status.unknown ? "Live readings are unavailable."
+        : !status.active ? "Send a prompt after starting a model."
+          : !status.ready ? "Speed appears when the server is ready."
+            : gen == null ? "Waiting for a live speed reading."
+              : gen === 0 && tele.stats.requests_running === 0 && !tele.stats.requests_waiting ? "Idle · send a prompt to see output speed."
+                : avg == null ? "Generated tokens per second." : "Recent sample average: " + num(avg) + " tokens/s";
+      chart.update(status.unknown ? [] : series);
     },
   };
-  api.el = el;
-  api.update();
-  return api;
+  view.update();
+  return view;
 }
 
-/** dashStopRun stops the run that serves. The write keeps the token and
- * CSRF rules of the shared api() helper. */
-async function dashStopRun() {
-  const run = dashLiveRun();
+// These are recorded launch settings, never inferred from GPU count or model name.
+function dashEngineConfig() {
+  const el = h("div.dash-engine-config");
+  const source = h("p.dash-engine-source");
+  const facts = h("dl.dash-engine-facts");
+  const values = ["Parallelism", "Context limit", "Precision", "Quantization"].map((label) => {
+    const row = factRow(label, "–");
+    facts.append(row);
+    return row.querySelector("dd");
+  });
+  el.append(source, facts);
+  return { el, update: (run) => {
+    el.hidden = !run;
+    const plan = run && run.plan;
+    facts.hidden = !plan;
+    source.textContent = plan && plan.model ? "Model source · " + plan.model
+      : "Model source and launch configuration were not recorded for this server.";
+    const args = plan && Array.isArray(plan.args) ? plan.args : [];
+    const option = (name) => {
+      const flag = "--" + name;
+      for (let i = 0; i < args.length; i++) {
+        if (args[i] === flag && args[i + 1] && !args[i + 1].startsWith("--")) return args[i + 1];
+        if (args[i].startsWith(flag + "=")) return args[i].slice(flag.length + 1);
+      }
+      return null;
+    };
+    const tp = option("tensor-parallel-size"), pp = option("pipeline-parallel-size");
+    const context = option("max-model-len");
+    const readings = [[tp ? "TP " + tp : "", pp ? "PP " + pp : ""].filter(Boolean).join(" · "),
+      context && Number.isFinite(Number(context)) ? num(Number(context), 0) + " tokens" : context,
+      option("dtype"), option("quantization")];
+    readings.forEach((reading, i) => {
+      const value = reading || "Not recorded";
+      if (values[i].textContent !== value) values[i].textContent = value;
+    });
+  } };
+}
+
+// Stop only the named server shown above; attached servers are only forgotten.
+async function dashStopRun(run = dashLiveRun()) {
   if (!run || run.state === "exited") { toast("There is no run to stop."); return; }
+  const question = run.foreign ? "Detach " + run.name + "? The model server will keep running."
+    : "Stop " + run.name + "? Active requests to this server will be interrupted.";
+  if (!window.confirm(question)) return;
   try {
     await api("/api/runs/" + encodeURIComponent(run.name), { method: "DELETE" });
-    toast("The run " + run.name + " was stopped.", true);
+    toast(run.foreign ? "Detached " + run.name + "; its server is still running." : "Stopped " + run.name + ".", true);
     await dashLoad();
-  } catch (e) {
-    toast("Stop failed: " + (e.message || e));
-  }
+  } catch (e) { toast((run.foreign ? "Detach" : "Stop") + " failed: " + (e.message || e)); }
 }
 
-/* ---------- the six serving tiles ---------- */
-
-/** dashMeaning is the plain meaning of a word from the shared glossary. */
 function dashMeaning(term) {
   const words = dash.glossary || {};
   return words[term] || "bernie did not publish an explanation for this measure.";
 }
 
-/** dashSimpleTiles are the six plain-language measures of a serving host. */
 function dashSimpleTiles() {
   const box = h("div.tiles.dash-simple-tiles");
   const defs = [
-    { key: "prompt", label: "Prompt reading", unit: "tok/s", term: "Prompt reading" },
+    { key: "prompt", label: "Prompt processing", unit: "tokens/s", term: "Prompt reading" },
     { key: "running", label: "Active requests", unit: "requests", term: "Active requests" },
-    { key: "ttft", label: "First token", unit: "s", term: "First token" },
+    { key: "ttft", label: "Time to first token", unit: "s", term: "First token" },
     { key: "kv", label: "KV cache", unit: "%", term: "KV cache" },
     { key: "prefix", label: "Prefix cache hits", unit: "%", term: "Prefix cache hits" },
     { key: "spec", label: "Draft accepted", unit: "%", term: "Draft accepted" },
@@ -131,40 +170,44 @@ function dashSimpleTiles() {
   const tiles = defs.map((d) => {
     const tile = dashTile({ label: d.label, unit: d.unit, tip: dashMeaning(d.term), value: "–", sub: "" });
     tile.key = d.key;
+    if (["prefix", "spec"].includes(d.key)) tile.classList.add("advanced-only");
     box.append(tile);
     return tile;
   });
   box.items = tiles;
   box.update = () => {
+    const run = dashLiveRun();
+    const status = dashRunStatus(run);
     const last = dash.samples[dash.samples.length - 1];
-    const agg = last ? last.agg : null;
+    const agg = status.ready && status.tele && status.tele.stats && last && last.run === run.name ? last.agg : null;
     for (const tile of tiles) {
       const key = tile.key;
-      let value = "–", sub = "n/a on this host", max = null;
+      let value = "–", max = null;
+      let sub = status.unknown ? "Live readings unavailable" : !status.active ? "Start a model to see this"
+        : !status.ready ? "Available when the server is ready"
+          : status.tele && status.tele.error ? "Live metrics unavailable" : "Waiting for live metrics";
       if (agg) {
         if (key === "prompt") {
           value = agg.prompt == null ? "–" : num(agg.prompt);
-          sub = agg.prompt == null ? "n/a on this host" : "reading the prompt";
+          sub = agg.prompt == null ? "Not reported by the server" : "tokens of input processed per second";
         } else if (key === "running") {
           value = agg.running == null ? "–" : num(agg.running, 0);
-          sub = agg.running == null ? "n/a on this host"
-            : agg.waiting == null ? "the waiting count is not published"
-              : num(agg.waiting, 0) + " waiting in line";
+          sub = agg.running == null ? "Not reported by the server"
+            : agg.waiting == null ? "Queue size not reported" : num(agg.waiting, 0) + " waiting in the queue";
         } else if (key === "ttft") {
           value = agg.ttft == null ? "–" : num(agg.ttft, 3);
-          sub = agg.ttft == null
-            ? (agg.statsKnown ? "the server measured no first token yet" : "n/a on this host")
-            : "p95 " + num(agg.ttftP95, 3) + " s";
+          sub = agg.ttft == null ? (agg.statsKnown ? "Send a prompt to measure this" : "Waiting for live metrics")
+            : "Typical wait" + (agg.ttftP95 == null ? "" : " · 95% within " + num(agg.ttftP95, 3) + " s");
         } else if (key === "kv") {
           value = agg.kv == null ? "–" : num(agg.kv * 100, 0);
-          sub = agg.kv == null ? "n/a on this host" : "of GPU cache in use";
+          sub = agg.kv == null ? "Not reported by the server" : "of GPU cache in use";
           max = 100;
         } else if (key === "prefix") {
           value = agg.prefix == null ? "–" : num(agg.prefix, 1);
           sub = agg.prefix == null
             ? (agg.prefixKnown === false
               ? "this server has no prefix cache"
-              : agg.statsKnown ? "the server read no prompt yet" : "n/a on this host")
+              : agg.statsKnown ? "No prompt processed yet" : "Waiting for live metrics")
             : num(agg.prefixCached, 0) + " of " + num(agg.prefixQueried, 0) + " prompt tokens came from cache";
           max = 100;
         } else if (key === "spec") {
@@ -172,7 +215,7 @@ function dashSimpleTiles() {
           sub = agg.spec == null
             ? (agg.specOn === false
               ? "speculation is off"
-              : agg.statsKnown ? "no draft tokens yet" : "n/a on this host")
+              : agg.statsKnown ? "No draft tokens yet" : "Waiting for live metrics")
             : "MTP drafts kept";
           max = 100;
         }
@@ -184,13 +227,11 @@ function dashSimpleTiles() {
   return box;
 }
 
-/* ---------- the two charts ---------- */
-
-/** dashSimpleCharts are the two request rates over the last five minutes. */
 function dashSimpleCharts(section) {
   const grid = h("div.dash-simple-chart-grid");
-  const output = areaChart([], { title: "Output speed · tok/s, last 5 min", unit: "tok/s", windowMinutes: 5 });
-  const prompt = areaChart([], { title: "Prompt reading · tok/s, last 5 min", unit: "tok/s", windowMinutes: 5 });
+  const hint = "Rates include all model servers. No live metrics means a gap, not zero.";
+  const output = areaChart([], { title: "All servers · output tokens/s · last 5 min", unit: "tok/s", hint: hint, windowMinutes: 5 });
+  const prompt = areaChart([], { title: "All servers · input tokens/s · last 5 min", unit: "tok/s", hint: hint, windowMinutes: 5 });
   grid.append(output, prompt);
   section.append(grid);
   return {
@@ -201,9 +242,6 @@ function dashSimpleCharts(section) {
   };
 }
 
-/* ---------- this machine and connect an app ---------- */
-
-/** dashSimpleMachine says what machine this is and what it can measure. */
 function dashSimpleMachine(section) {
   const el = h("div.card.dash-simple-panel");
   const facts = h("dl.kv.dash-machine-facts");
@@ -214,47 +252,46 @@ function dashSimpleMachine(section) {
       const hw = dash.hw || {};
       const host = hw.host || {};
       const gpus = hw.gpus || [];
-      const rows = [
-        ["Host", host.hostname || "–", ""],
-        ["CPU", host.cpu && host.cpu.model ? host.cpu.model : "–", ""],
-        ["RAM", host.ram_bytes ? bytes(host.ram_bytes) : "–", ""],
-        ["GPUs", gpus.length ? num(gpus.length, 0) + " cards" : "–", gpus.length ? gpus.map((g) => g.name || g.gfx).filter(Boolean).join(" · ") : "no AMD GPU is visible"],
-        ["CPU load", "–", "n/a on this host"],
-        ["Requests served", "–", "n/a on this host"],
-      ];
+      const rows = dash.hw ? [
+        ["Host", host.hostname || "Not reported", ""],
+        ["CPU", host.cpu && host.cpu.model ? host.cpu.model : "Not reported", ""],
+        ["RAM", host.ram_bytes ? bytes(host.ram_bytes) : "Not reported", ""],
+        ["GPUs", gpus.length + (gpus.length === 1 ? " card" : " cards"),
+          gpus.map((g) => g.name || g.gfx).filter(Boolean).join(" · ")],
+      ] : [["Hardware", "Unavailable", (dash.errors || {})["/api/hw"] || "Hardware data has not arrived."]];
       put(facts, rows.map(([label, value, why]) => h("div",
         h("dt", label), h("dd", value, why ? h("span.why", why) : null))));
     },
   };
 }
 
-/** dashBuildSimple builds the operational reading order of the Dashboard
- * tab: hero, six tiles, two charts, GPU cards, machine and connect blocks. */
+// The overview leads to an action; detailed charts stay secondary.
 function dashBuildSimple(root) {
   const hero = dashSimpleHero();
   const tiles = dashSimpleTiles();
-  const minutes = dashSection("The request rates", "simple-minutes");
-  const gpus = dashSection("GPUs", "gpus");
+  const engine = dashSection("Engine metrics", "engine");
+  engine.append(tiles);
+  const minutes = dashSection("Host-wide throughput history", "simple-minutes");
+  minutes.classList.add("advanced-only");
+  const gpus = dashSection("GPU overview", "gpus");
   gpus.id = "dashboard-gpus";
   const bottom = h("div.dash-simple-bottom");
   const details = dashDetails();
-  put(root, hero.el, tiles, minutes, gpus, bottom, details.el);
+  put(root, hero.el, engine, gpus, bottom, minutes, details.el);
   const api = {
     hero: hero,
     tiles: tiles,
     charts: dashSimpleCharts(minutes),
-    cards: dashCards(gpus),
-    machine: dashSimpleMachine(bottom),
+    gpus: dashGPUOverview(gpus),
     connect: dashSimpleConnect(bottom),
-    details: details,
+    machine: dashSimpleMachine(bottom),
   };
   dash.live.simple = api;
   return api;
 }
 
-/** dashSimpleConnect gives an app the address and a copyable request. */
 function dashSimpleConnect(section) {
-  const el = h("div.card.dash-simple-panel");
+  const el = h("div.card.dash-simple-panel", { id: "dashboard-connect" });
   const text = h("p.dash-connect-text");
   const command = h("div.dash-connect-command");
   const segmented = h("div.segmented-control", { role: "group", "aria-label": "The language of the connect snippet" });
@@ -273,21 +310,28 @@ function dashSimpleConnect(section) {
   let painted = "";
   const paint = () => {
     const run = dashLiveRun();
-    const endpoint = connectEndpoint(run && run.state !== "exited" ? run : null);
-    const key = kind + "|" + endpoint.base + "|" + endpoint.model;
+    const status = dashRunStatus(run);
+    const endpoint = connectEndpoint(status.active ? run : null);
+    const key = kind + "|" + endpoint.base + "|" + endpoint.model + "|" + status.label;
     if (key === painted) return;
     painted = key;
     if (!endpoint.base) {
-      put(text, "Start a model server to get an address and a ready-to-paste request. Already running one? Use ", h("code", "bernie attach <port>"), ".");
-      put(command, emptyState("No run is serving.", "A run is a model server on this host.", "bernie serve <recipe>"));
+      const inspect = status.active || status.unknown;
+      put(text, inspect ? "The server’s API address is unavailable. " : "Start a model to get connection details. ",
+        h("a", { href: inspect ? "#logs" : "#setup" }, inspect ? "Inspect the server in Logs" : "Open Setup"));
+      put(command, emptyState("No model API address is available.",
+        "An app needs the model server’s base URL, not the dashboard URL.", inspect ? "bernie ps" : "bernie serve <recipe>"));
       return;
     }
-    put(text, "Any OpenAI-compatible app works. Give it the base URL ", h("code", endpoint.base + "/v1"),
-      " and the model ", h("b", endpoint.model), ". No API key needed.");
+    put(text, "Use this base URL in an OpenAI-compatible app: ", h("code", endpoint.url),
+      ". Configured model: ", h("b", endpoint.model), ". This is the model API, not the dashboard address. ",
+      status.ready ? "" : "The server is not confirmed ready; check its status above before sending requests.");
     const snippet = connectSnippet(kind, endpoint);
     put(command, cmdBlock(snippet, "Copy the " + kind + " snippet"));
   };
-  el.append(cardHead("Connect an app"), segmented, text, command);
+  el.append(cardHead("Connect an app"), text,
+    h("p.small.muted", "127.0.0.1 is local to the model host. An app on another machine needs that host’s reachable address and model port."),
+    h("details.advanced", h("summary", "Example requests · curl or Python"), segmented, command));
   section.append(el);
   return { update: paint };
 }

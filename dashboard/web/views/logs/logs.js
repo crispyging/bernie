@@ -1,7 +1,4 @@
-// ---------- Logs: what did the server say? ----------
-// The tab answers one question: what did the server say? The order of the
-// page is the state headline, the run picker, the known problems of the log
-// doctor, the tail and the advanced panel (design/logs.md).
+// Logs: status, recovery steps, then the searchable stream.
 "use strict";
 
 let logsTail = null;  // the tail of the picked run
@@ -33,7 +30,7 @@ async function viewLogs(root) {
   let runs = [];
   let headKind = "";   // the headline that owns the line under it
 
-  const rescan = h("button.primary", { type: "button", onclick: () => refresh() }, "Re-scan");
+  const rescan = h("button.primary", { type: "button", onclick: () => refresh() }, "Refresh logs");
   const download = h("button", { type: "button", disabled: true, onclick: () => {
     if (!tail.save()) toast("There is no log to download yet.");
   } }, "Download the log");
@@ -43,10 +40,10 @@ async function viewLogs(root) {
   const advanced = logsAdvanced(() => logsRun);
 
   put(root, head,
-    logSection("THE RUN", runsBox),
-    logSection("THE KNOWN PROBLEMS", findBox),
-    logSection("THE LOG", tail.el),
-    logSection("Show details", advanced));
+    logSection("Selected run", runsBox),
+    logSection("Problems and recovery steps", findBox),
+    logSection("Live log", tail.el),
+    advanced);
 
   /** setLede writes the line under the headline. The count of the lines
    *  changes with every line, the headline does not. */
@@ -62,28 +59,28 @@ async function viewLogs(root) {
    *  and speak for themselves. */
   function setHeadline(run, matches) {
     const known = (matches || []).filter((m) => m.severity === "error");
+    if (known.length) {
+      headKind = "failed";
+      setHead(head, "Log errors need attention.",
+        "Process state: " + (run.state || "unknown") + ". " +
+        (known[0].cause || "A known error pattern was found.") + " Review the recovery steps below.");
+      return;
+    }
     if (run.state === "running") {
       headKind = "running";
-      setHead(head, "THE SERVER IS RUNNING.",
+      setHead(head, "Following " + run.name + ".",
         "The tail follows the log of " + run.name + ". " + logCount(tail.count()) + " lines so far.");
       return;
     }
     if (run.state === "starting") {
       headKind = "starting";
-      setHead(head, "THE SERVER IS STARTING.",
+      setHead(head, "The server is starting.",
         (run.phase && run.phase.sentence) || "The server is loading the model. The tail follows it.");
       return;
     }
-    if (known.length) {
-      headKind = "failed";
-      setHead(head, "THE SERVER FAILED FOR A KNOWN REASON.",
-        "The log matched the rule " + known[0].id + ". The fix is above.");
-      return;
-    }
-    const age = run.started_at ? ago(run.started_at) : "";
     headKind = "ended";
-    setHead(head, "THE RUN ENDED" + (age ? " " + age.toUpperCase() : "."),
-      "The log holds the last words of the server. The known problems are above.");
+    setHead(head, "The run has ended.",
+      "The log remains available. Review any problems above before restarting in Setup.");
   }
 
   /** loadFindings reads the findings of the log doctor for the picked run. */
@@ -134,7 +131,7 @@ async function viewLogs(root) {
       put(runsBox, failed(e));
       put(findBox, emptyState("The findings could not be read.", "Try again.", "bernie doctor --run NAME"));
       headKind = "error";
-      setHead(head, "THE RUNS COULD NOT BE READ.", "Try again.");
+      setHead(head, "Runs could not be read.", "Press Refresh logs to try again. Their status is unknown.");
       return;
     }
     runs = logRuns(doc);
@@ -142,14 +139,12 @@ async function viewLogs(root) {
       put(runsBox, emptyState("No run has ever served on this host.",
         "A run is a model server on this host: it loads the model and then answers requests.",
         "bernie serve <recipe>"));
-      put(findBox, emptyState("No known failure in this log.",
-        "bernie knows the failures of this server; none of them is in this log.",
-        "bernie doctor --run NAME"));
+      put(findBox, emptyState("No log to inspect yet.", "Start a model server in Setup.", "bernie serve <recipe>"));
       logsRun = "";
       tail.close();
       download.disabled = true;
       headKind = "none";
-      setHead(head, "NO LOG YET.", "Start the server first, then follow its log here.");
+      setHead(head, "No log yet.", "Start the server first, then follow its log here.");
       return;
     }
     const keep = runs.find((r) => r.name === logsRun);

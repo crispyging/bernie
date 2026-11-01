@@ -1,18 +1,5 @@
 "use strict";
-// ---------- Advanced: the operator's console ----------
-// The Advanced tab answers one question: what can the operator inspect and
-// change on this host? It holds the exact per-GPU table, the power caps
-// (the read and the one write of the page), the doctor report in full, the
-// jobs of the host, the run record and the raw documents of every endpoint
-// the page reads.
-//
-// The old first-dashboard layout is gone: the tiles and the cards are on the
-// Dashboard tab, the PCIe tree and the P2P checklist are on the Topology
-// tab. The per-GPU table is the one implementation of components/gputable.js:
-// the details of the Dashboard tab and this tab share it.
-//
-// The stream is the one of the page: js/data.js owns it and this view
-// registers its repaint with onTabFrame. It opens no stream of its own.
+// Operator console: diagnose first, inspect evidence, then make deliberate changes.
 
 const adv = {
   hw: null,       // /api/hw
@@ -31,47 +18,43 @@ const adv = {
 async function viewAdvanced(root) {
   put(root, loading());
   adv.live = {};
-  const head = stateHead("Advanced",
+  const head = stateHead("Host tools",
     h("button.primary", { type: "button", onclick: () => advReload() }, "Re-check the host"));
   adv.head = head;
   const table = gpuValueTable([], [], []);
-  const power = advPowerCard();
-  const tools = advToolsCard();
-  const doctor = advDoctorReport();
-  const jobs = advJobList();
-  const runs = advRunsTable();
-  const measures = advServerMeasures();
-  const prefs = advPrefsCard();
-  const report = advReportCard();
+  const power = advPowerCard(), tools = advToolsCard(), doctor = advDoctorReport();
+  const jobs = advJobList(), runs = advRunsTable(), measures = advServerMeasures();
+  const prefs = advPrefsCard(), report = advReportCard();
+  const section = (id, title, ...kids) => h("section.section", {
+    id: "advanced-" + id, "data-section": id,
+  }, sectionLabel(title), ...kids);
+  const groups = [
+    ["Diagnose", [["doctor", "Health checks"], ["jobs", "Background work"]]],
+    ["Inspect", [["gpus", "GPU values"], ["run", "Run history"], ["measures", "Server timings"]]],
+    ["Change", [["power", "Power limits"], ["tools", "Memory and power tools"], ["prefs", "Preferences"]]],
+    ["Share", [["report", "Support report"], ["documents", "Raw data"]]],
+  ];
   put(root, head,
-    h("section.section", { id: "advanced-gpus", "data-section": "gpus" },
-      sectionLabel("The per-GPU values"),
-      h("div.card",
-        cardHead("All GPU values", "/api/hw",
-          h("button.small", { type: "button", onclick: () => advCopyCardList() }, "Copy the card list")),
-        table.el)),
-    h("section.section", { id: "advanced-power", "data-section": "power" },
-      sectionLabel("The power caps"), power.el),
-    h("section.section", { id: "advanced-tools", "data-section": "tools" },
-      sectionLabel("The ECC and the power tools"), tools.el),
-    h("section.section", { id: "advanced-doctor", "data-section": "doctor" },
-      sectionLabel("The doctor report"), doctor.el),
-    h("section.section", { id: "advanced-jobs", "data-section": "jobs" },
-      sectionLabel("The jobs"), jobs.el),
-    h("section.section", { id: "advanced-run", "data-section": "run" },
-      sectionLabel("The run record"), runs.el),
-    h("section.section", { id: "advanced-prefs", "data-section": "prefs" },
-      sectionLabel("The preferences"), prefs.el),
-    h("section.section", { id: "advanced-report", "data-section": "report" },
-      sectionLabel("The share report"), report.el),
-    h("section.section", { id: "advanced-measures", "data-section": "measures" },
-      sectionLabel("The server measures"), measures.el),
-    h("section.section", { id: "advanced-documents", "data-section": "documents" },
-      sectionLabel("The raw documents"), advDocuments()));
-  adv.live = {
-    table: table, power: power, tools: tools, doctor: doctor, jobs: jobs, runs: runs,
-    measures: measures, prefs: prefs, report: report,
-  };
+    h("nav.card", { "aria-label": "Operator console sections" },
+      h("p.small.muted", "Start with health checks. Inspecting data does not change the host; controls and copied commands can."),
+      groups.map(([title, links]) => h("div.row", h("b", title + ":"),
+        links.map(([id, label]) => h("a", { href: "#advanced/" + id }, label))))),
+    section("doctor", "Diagnose · Health checks", doctor.el),
+    section("jobs", "Diagnose · Background work", jobs.el),
+    section("gpus", "Inspect · GPU values",
+      h("details.advanced", h("summary", "GPU measurements and hardware identifiers"),
+        h("div.card", cardHead("All GPU values", "/api/hw",
+          h("button.small", { type: "button", onclick: () => advCopyCardList() }, "Copy the card list")), table.el))),
+    section("run", "Inspect · Run history", runs.el),
+    section("measures", "Inspect · Server timings",
+      h("details.advanced", h("summary", "Latency, cache and request counters"), measures.el)),
+    section("power", "Change · Power limits", power.el),
+    section("tools", "Change · Memory and power tools", tools.el),
+    section("prefs", "Change · Preferences",
+      h("details.advanced", h("summary", "Stored settings and their effective values"), prefs.el)),
+    section("report", "Share · Support report", report.el),
+    section("documents", "Share · Raw data", advDocuments()));
+  adv.live = { table, power, tools, doctor, jobs, runs, measures, prefs, report };
   await advLoad();
   advSubscribe();
 }
@@ -80,7 +63,7 @@ async function viewAdvanced(root) {
  *  others: the card that failed says so. */
 async function advLoad() {
   const one = async (path, key) => {
-    try { adv[key] = await api(path); }
+    try { adv[key] = await api(path); if (adv.errors) delete adv.errors[path]; }
     catch (e) { adv[key] = null; adv.errors = adv.errors || {}; adv.errors[path] = e.message || String(e); }
   };
   await Promise.all([
@@ -91,6 +74,8 @@ async function advLoad() {
   ]);
   if (!Array.isArray(adv.runs)) adv.runs = [];
   if (!Array.isArray(adv.jobs)) adv.jobs = [];
+  adv.tele = state.livePaused ? state.pausedTele : state.tele;
+  adv.server = adv.tele && ((adv.tele.runs || []).find((r) => r.state !== "exited") || null);
   advPaint();
   await adv.live.power.reload();
   await adv.live.prefs.reload();
@@ -105,7 +90,7 @@ async function advReload() {
   adv.errors = {};
   try { await refreshHost(); } catch { /* the cache drop is best-effort */ }
   await advLoad();
-  toast("The host was read again.");
+  toast("Host re-check finished. Review any unavailable sections below.");
 }
 
 /** advPaint repaints every part of the tab with the documents it holds. */
@@ -123,20 +108,25 @@ function advPaint() {
   adv.live.measures.update(adv.server);
 }
 
-/** advHead writes the headline of the tab: the situation of the host in one
- *  sentence, and what the tab holds under it. */
+/** Summarize only checks that actually ran; missing data is not a pass. */
 function advHead(head) {
   if (!head) return;
-  const sum = (adv.doctor && adv.doctor.summary) || {};
-  const fail = sum.fail || 0;
-  const warn = sum.warn || 0;
-  const title = fail
-    ? fail + (fail === 1 ? " check fails" : " checks fail") + " on this host"
-    : warn
-      ? warn + (warn === 1 ? " check warns" : " checks warn") + " on this host"
-      : "Every check of this host passed";
-  setHead(head, title,
-    "The operator's console: the exact values of every card, the power caps, the whole doctor report, the jobs of the host and the raw documents behind them.");
+  const report = adv.doctor;
+  if (!report || !(report.checks || []).length) {
+    setHead(head, "Host health is not known yet.",
+      "Health checks are unavailable or empty. Re-check the host, or run bernie doctor; do not treat missing results as a pass.");
+    return;
+  }
+  const sum = report.summary || {};
+  const fail = sum.fail || 0, warn = sum.warn || 0, skip = sum.skip || 0;
+  const title = fail ? fail + (fail === 1 ? " blocking check needs repair." : " blocking checks need repair.")
+    : warn ? warn + (warn === 1 ? " warning needs review." : " warnings need review.")
+      : "No blocking health check found.";
+  const next = fail ? "Start with the failed health checks below, apply the relevant fix, then re-check."
+    : warn ? "Review the warnings below before changing settings or starting a demanding run."
+      : "Inspect GPU values or run history below; changes are grouped separately.";
+  setHead(head, title, next + (skip ? " " + skip + " checks could not run; their results remain unknown." : "")
+    + (Object.keys(adv.errors || {}).length ? " Some host data is unavailable; re-check to try again." : ""));
 }
 
 /** advSubscribe registers the repaint of this tab on the shared stream. The
@@ -161,44 +151,40 @@ function advSubscribe() {
   return adv.unsub;
 }
 
-/** advRunsTable is the run record of the host: every run this host knows,
- *  with its state, its recipe, its port and its process. */
+/** Recorded runs, including ended ones; process details are secondary. */
 function advRunsTable() {
   const card = h("div.card");
   const view = {
     el: card,
     update: (runs) => {
       const list = runs || [];
+      const error = (adv.errors || {})["/api/runs"];
       if (!list.length) {
-        put(card, cardHead("The run record", "/api/runs"),
-          emptyState("No run is serving.",
-            "A run is a model server on this host: it loads the model and then answers requests.",
-            "bernie serve <recipe>"));
+        put(card, cardHead("Run history", "/api/runs"),
+          emptyState(error ? "Run history could not be read." : "No runs are recorded.",
+            error ? "Re-check the host to try again." : "Start a model server in Setup; its history and logs will appear here.",
+            error ? "bernie ps" : "bernie serve <recipe>"), error ? h("p.err", error) : null);
         return;
       }
       const rows = list.map((r) => h("tr",
-        h("td", r.name || "–"),
+        h("td", r.recipe || r.name || "–"),
         h("td", badge(r.state || "skip")),
-        h("td", r.recipe || "–"),
-        h("td", r.mode || "host"),
-        h("td.num", r.port ? String(r.port) : "–"),
-        h("td.num", r.pid ? String(r.pid) : "–"),
-        h("td", r.started_at ? ago(r.started_at) : "–")));
-      put(card,
-        cardHead("The run record", "/api/runs",
-          h("span.small.muted", list.length + " runs"),
-          h("a.small", { href: "#logs" }, "manage")),
-        h("div.scroll", h("table",
-          tableHead(["Run", "State", "Recipe", "Mode", { label: "Port", num: true },
-            { label: "PID", num: true }, "Since"]),
-          h("tbody", rows))));
+        h("td", r.started_at ? ago(r.started_at) : "not recorded"),
+        h("td.advanced-only", r.name || "–"),
+        h("td.advanced-only", r.mode || "host"),
+        h("td.num.advanced-only", r.port ? String(r.port) : "–"),
+        h("td.num.advanced-only", r.pid ? String(r.pid) : "–")));
+      put(card, cardHead("Run history", "/api/runs", h("span.small.muted", list.length + " runs"),
+        h("a.small", { href: "#logs" }, "Read run logs")),
+        h("div.scroll", h("table", h("thead", h("tr",
+          ["Recipe", "State", "Started", "Run", "Mode", "Port", "PID"].map((label, i) =>
+            h("th", { scope: "col", class: i > 2 ? "advanced-only" : null }, label)))), h("tbody", rows))));
     },
   };
   return view;
 }
 
-/** advCardListText writes the cards as plain text: one line per card, so
- *  it can be pasted into a report or a ticket. */
+/** Tab-separated GPU values for a support report. */
 function advCardListText() {
   const gpus = (adv.hw && adv.hw.gpus) || [];
   const samples = (adv.tele && adv.tele.gpus) || [];
@@ -222,9 +208,7 @@ async function advCopyCardList() {
   toast(ok ? "The card list is on the clipboard." : "Copy failed: select the text and copy it.", ok);
 }
 
-/** advServerMeasures is the table of what the server of the live run
- *  measures: the latencies of the last minute and the counters since the
- *  server started. A measure the server does not publish is a dash. */
+/** Request measurements may be absent even while a run exists. */
 function advServerMeasures() {
   const card = h("div.card");
   const lat = (d) => (d ? num(d.p50, 3) + " s p50, " + num(d.p95, 3) + " s p95" : "–");
@@ -240,9 +224,9 @@ function advServerMeasures() {
       const st = run && run.stats ? run.stats : null;
       const w = run && run.window ? run.window : null;
       if (!st) {
-        put(card, cardHead("The server measures", "/api/telemetry"),
-          emptyState("No run is serving.", "A run is a model server on this host.",
-            "bernie serve <recipe>"));
+        put(card, cardHead("Server measurements", "/api/telemetry"),
+          emptyState(run ? "This run has not published request measurements." : "No server measurements have arrived.",
+            "Open Logs to check the run. A missing measurement does not mean zero latency or an idle server.", "bernie ps"));
         return;
       }
       const rows = [
@@ -258,7 +242,8 @@ function advServerMeasures() {
         ["Waiting by reason", "–", count(st.waiting_by_reason)],
         ["Finished by reason", "–", count(st.finished_by_reason)],
       ];
-      put(card, cardHead("The server measures", "/api/telemetry"),
+      put(card, cardHead("Server measurements", "/api/telemetry"),
+        h("p.small.muted", "A dash means not reported, not zero. p50 is the median; p95 is the time 95% of requests finish within."),
         h("div.scroll", h("table",
           tableHead(["Measure", "Last minute", "Since the start"]),
           h("tbody", rows.map((r) => h("tr", h("td", r[0]), h("td", r[1]), h("td", r[2])))))));

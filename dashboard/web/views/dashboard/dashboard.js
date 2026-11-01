@@ -1,12 +1,5 @@
 "use strict";
-// ---------- Dashboard ----------
-// The Dashboard tab asks one question: is this box serving, and how fast?
-//
-// Every number comes from an endpoint of spec §11. The live numbers come from
-// one stream (GET /api/telemetry at 1 Hz) and the charts of the last minutes
-// from GET /api/gpus/history. The view never opens a fetch or a timer of its
-// own: the stream lives in js/data.js.
-//
+// Dashboard uses the shared telemetry stream; it opens no timer or stream.
 // Adapted from vllm-rdna-dash by CrispyGinger, used with permission.
 
 const dash = {
@@ -22,60 +15,48 @@ const dash = {
   subscribed: false, // the repaint of this tab is registered on the stream
 };
 
-// dashSection is one block of the tab: a rule on top, the name of the block
-// and what it holds. The name is a heading the router can focus.
 function dashSection(label, id, ...kids) {
   return h("section.section", { id: "dashboard-" + id, "data-section": id },
     sectionLabel(label),
     ...kids);
 }
 
-// dashInfo is the small mark that opens the explanation of a number. The
-// explanation is never the only copy of the fact: the tile says it too.
 function dashInfo(text) {
   if (typeof tooltip === "function") return tooltip(text, "What this number means");
   return h("span.tip", h("button", { type: "button", title: text, "aria-label": "What this number means" }, "i"));
 }
 
-// dashGroup writes a number with a thin space between the thousands.
-function dashGroup(n) {
-  const s = String(Math.round(n));
-  return s.replace(/\B(?=(\d{3})+(?!\d))/g, " ");
-}
-
-// The stream lives in js/data.js; the shell calls renderGPUs() on every
-// telemetry message. This view opens no fetch and no timer of its own.
-
-// dashPush keeps one compact sample of the stream and the serving numbers it
-// carries. The buffer holds one hour, so every chart window stays covered.
 function dashPush(doc) {
   dash.tele = doc;
   const gpus = doc.gpus || [];
   const runs = doc.runs || [];
-  const live = runs.find((r) => r.state !== "exited") || runs[0] || null;
+  const current = dashLiveRun();
+  const live = current && current.state !== "exited" ? runs.find((r) => r.name === current.name && r.state !== "exited") : null;
   const cards = gpus.map((g) => ({
     hip: g.hip_index, busy: g.busy_pct, pow: g.power_w, mem: g.vram_used,
-    tmp: g.temp_c, jtmp: g.temp_junction_c, mtmp: g.temp_mem_c,
-    clk: g.sclk_mhz, mclk: g.mclk_mhz, cap: g.power_cap_w, total: g.vram_total,
+    pci: (((dash.hw && dash.hw.gpus) || []).find((hw) => hw.hip_index === g.hip_index) || {}).pci || "",
+    tmp: g.temp_c, cap: g.power_cap_w, total: g.vram_total,
   }));
-  const stats = live && live.stats ? live.stats : null;
+  const stats = live && live.state === "running" ? live.stats : null;
+  let gen = 0, prompt = 0, known = runs.length > 0;
+  for (const run of runs) {
+    if (!run.stats) { known = false; break; }
+    gen += run.gen_tok_s || 0;
+    prompt += run.prompt_tok_s || 0;
+  }
   dash.samples.push({
-    t: doc.time || Date.now(),
-    cards: cards,
+    t: doc.time || Date.now(), run: live ? live.name : null, cards: cards,
+    fleet: { gen: known ? gen : null, prompt: known ? prompt : null },
     agg: {
-      gen: live ? live.gen_tok_s : null,
-      prompt: live ? live.prompt_tok_s : null,
+      gen: stats ? live.gen_tok_s : null,
+      prompt: stats ? live.prompt_tok_s : null,
       running: stats ? stats.requests_running : null,
       waiting: stats ? stats.requests_waiting : null,
       kv: stats ? stats.kv_cache_usage : null,
       spec: stats && stats.spec_draft_tokens_total > 0 ? stats.spec_accept_rate * 100 : null,
       statsKnown: !!stats,
-      // What the server publishes: a server without the counters has no
-      // such measure.
       specOn: stats ? !!stats.speculation : null,
       prefixKnown: stats ? !!stats.prefix_cache : null,
-      // The measures of the server since it started: the time to the
-      // first token and the share of the prompt that came from the cache.
       ttft: stats && stats.ttft ? stats.ttft.p50 : null,
       ttftP95: stats && stats.ttft ? stats.ttft.p95 : null,
       prefix: stats && stats.prefix_cache && stats.prefix_cache_queries_total > 0
@@ -87,46 +68,59 @@ function dashPush(doc) {
   if (dash.samples.length > 3600) dash.samples.shift();
 }
 
-// dashSeries is the last minute of one fleet number: the sparkline of a tile.
 function dashSeries(key, count) {
-  const n = count || 60;
-  return dash.samples.slice(-n).map((s) => (s.agg ? s.agg[key] : null));
+  const run = dashLiveRun();
+  return dash.samples.slice(-(count || 60)).map((s) =>
+    run && run.state !== "exited" && s.run === run.name && s.agg ? s.agg[key] : null);
 }
 
-// dashCardSeries is the last minute of one card.
-function dashCardSeries(hip, key) {
-  return dash.samples.slice(-60).map((s) => {
-    const c = s.cards.find((x) => x.hip === hip);
-    return c ? c[key] : null;
-  });
-}
 
-// dashCardName is the name of a card: the one of /api/hw, or its index.
-function dashCardName(hip) {
-  const g = ((dash.hw && dash.hw.gpus) || []).find((x) => x.hip_index === hip);
-  if (!g) return "GPU " + hip;
-  return g.name || g.gfx || ("GPU " + hip);
-}
 
-// dashLiveRun is the run the tab talks about.
 function dashLiveRun() {
-  const runs = dash.runs || [];
+  const runs = runsOf(state.runs);
+  const latest = state.tele || dash.tele;
+  if (latest && Array.isArray(latest.runs) && !(latest.time && Date.now() - latest.time > STALE_MS)) {
+    const live = latest.runs.find((r) => r.state !== "exited");
+    if (live) return Object.assign({}, runs.find((r) => r.name === live.name), live);
+    const last = runs[runs.length - 1];
+    return last ? Object.assign({}, last, { state: "exited" }) : null;
+  }
   return runs.find((r) => r.state !== "exited") || runs[runs.length - 1] || null;
 }
 
-// dashPhase is the phase sentence of a run: what the log says it is doing.
-function dashPhase(run) {
-  if (!run) return "";
-  if (run.phase && run.phase.sentence) return run.phase.sentence;
-  if (run.state === "starting") return "The server is loading the model.";
-  return "";
+// Health and metrics are independent: missing /metrics does not mean loading.
+function dashRunStatus(run) {
+  const tele = run && dash.tele && (dash.tele.runs || []).find((r) => r.name === run.name);
+  const active = !!run && run.state !== "exited";
+  const phase = run && run.phase ? run.phase.id : "";
+  const latest = state.tele || dash.tele;
+  const unknown = !!(latest && (latest.error || (latest.time && Date.now() - latest.time > STALE_MS)))
+    || !!(!latest && dash.errors && dash.errors["/api/runs"]);
+  const failed = active && phase === "failed";
+  const unresponsive = active && (run.answering === false || run.state === "unresponsive"
+    || (run.state === "starting" && (run.foreign || phase === "ready")));
+  const ready = !unknown && active && !failed && !unresponsive && run.state === "running";
+  const label = unknown ? "Status unavailable" : failed ? "Server failed" : unresponsive ? "Not responding"
+    : ready ? "Ready" : active ? "Starting" : run ? "Stopped" : "No model running";
+  const message = unknown ? "Live status could not be confirmed. Check the connection or open Logs."
+    : failed ? "The server reported a startup failure. Open Logs before trying again."
+      : unresponsive ? "The server is recorded, but its health check is not answering. Open Logs to investigate."
+        : ready ? (run.name || "The model") + " passed its health check. Try a prompt in Chat or connect an app."
+          : active ? dashPhase(run) : run ? "The last model server stopped. Open Logs for details, or start a model."
+            : "Start a model on the Setup tab, then return here to test it.";
+  return { tele, active, ready, unknown, label, message,
+    kind: unknown || unresponsive ? "warn" : failed ? "fail" : ready ? "ok" : active ? "running" : "skip" };
 }
 
-// dashLoad reads the documents the tab needs. One failure does not stop the
-// others: the card that failed says so.
+function dashPhase(run) {
+  if (!run) return "";
+  return run.phase && run.phase.sentence ? run.phase.sentence : "The server is starting; its health check is not ready yet.";
+}
+
+// Read failures stay visible without blocking the other cards.
 async function dashLoad() {
   const one = async (path, key) => {
-    try { dash[key] = await api(path); }
+    try { dash[key] = await api(path); if (dash.errors) delete dash.errors[path]; }
     catch (e) { dash[key] = null; dash.errors = dash.errors || {}; dash.errors[path] = e.message || String(e); }
   };
   await Promise.all([
@@ -144,23 +138,21 @@ async function dashLoad() {
     dash.errors["/api/glossary"] = e.message || String(e);
   }
   if (!Array.isArray(dash.runs)) dash.runs = [];
+  else state.runs = dash.runs;
   dashUpdateSimple();
 }
 
-// dashUpdateSimple repaints the operational view.
 function dashUpdateSimple() {
   const api = dash.live.simple;
   if (!api) return;
   api.hero.update();
   api.tiles.update();
   api.charts.update();
-  api.cards.update();
+  api.gpus.update();
   api.machine.update();
   api.connect.update();
-  if (api.details) api.details.update();
 }
 
-// dashHistory reads the five minutes of history that the Simple charts show.
 async function dashHistory() {
   try {
     dash.history = await api("/api/gpus/history?window=5m");
@@ -172,37 +164,28 @@ async function dashHistory() {
   if (dash.live.simple) dash.live.simple.charts.update();
 }
 
-// dashWindowSeries is the output or prompt rate over the last five minutes:
-// the history of the server when it has one, the ring buffer of the page when
-// it does not. A missing sample stays missing: the chart draws a gap.
+// History contains host-wide rates, not the rates of the displayed run.
 function dashWindowSeries(key) {
   if (dash.historyOK && dash.history && dash.history.series && dash.history.series.length) {
-    const series = dash.history.series;
-    const n = series[0].busy_pct ? series[0].busy_pct.length : 0;
     const field = key === "prompt" ? "prompt_tok_s" : "tokens_per_s";
-    const out = [];
-    for (let i = 0; i < n; i++) {
-      const value = series[0][field] && series[0][field][i] != null ? series[0][field][i] : null;
-      out.push(value);
-    }
-    return out;
+    return dash.history.series[0][field] || [];
   }
-  return dash.samples.slice(-300).map((s) => (s.agg ? s.agg[key] : null));
+  return dash.samples.slice(-300).map((s) => s.fleet ? s.fleet[key] : null);
 }
 
 async function viewDashboard(root) {
   put(root, loading());
   dash.live = {};
   dash.errors = {};
-  if (state.tele) dashPush(state.tele);
+  dash.tele = (state.livePaused ? state.pausedTele : state.tele) || null;
   await dashLoad();
+  if (dash.tele) dashPush(dash.tele);
   dashBuildSimple(root);
   await dashHistory();
   dashSubscribe();
   renderGPUs();
 }
 
-// dashSample is the stream: it keeps the sample and repaints the live parts.
 function dashSample(doc) {
   dashPush(doc);
   dashUpdateSimple();

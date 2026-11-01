@@ -1,11 +1,5 @@
 "use strict";
-// ---------- The power caps of the host ----------
-// The read of the cap of every card and the one write of the page: the
-// desired cap of a card. The service clamps the value to the range the card
-// allows; the row shows that range before the write.
-
-/** advPowerCard is the card with the power caps of the host. It reads the
- *  document itself and reads it again after every write. */
+// Save a desired cap explicitly; the service enforces the GPU's allowed range.
 function advPowerCard() {
   const card = h("div.card");
   const view = {
@@ -27,14 +21,13 @@ function advPowerCard() {
   return view;
 }
 
-/** advPaintPower paints the power card: the state of the service, the cap of
- *  every card and the control that sets the desired cap. */
+/** Current, allowed and desired limits precede the write controls. */
 function advPaintPower(card, view) {
   const p = view.power;
   if (!p) {
-    put(card, cardHead("The power caps", "/api/power"),
-      emptyState("The power caps are not available.",
-        "The caps of the cards come from the power service of the host.",
+    put(card, cardHead("Power limits", "/api/power"),
+      emptyState("Power limits could not be read.",
+        "Re-check the host, or inspect its power service with the command below. No limit can be changed here until it is available.",
         "bernie tune power status"));
     return;
   }
@@ -43,7 +36,8 @@ function advPaintPower(card, view) {
       + (p.active ? "watching changes" : "not watching changes")
     : "not installed";
   const children = [
-    cardHead("The power caps", "/api/power", badge(p.state || "skip")),
+    cardHead("Power limits", "/api/power", badge(p.state || "skip")),
+    h("p.small", "Changing a limit affects power draw, heat and performance. Edit a target, then save and confirm; viewing this page does not change it."),
     h("div.muted", "Service: " + service),
   ];
   if (!p.installed) {
@@ -59,17 +53,15 @@ function advPaintPower(card, view) {
   const rows = (p.gpus || []).map((g) => advPowerRow(g, p.installed, view));
   if (rows.length) {
     children.push(h("div.scroll", h("table",
-      tableHead(["GPU", "Current", "Allowed", "Desired", "Set", "State"]),
+      tableHead(["GPU", "Current limit", "Allowed range", "Saved target", "New target", "State"]),
       h("tbody", rows))));
   } else {
-    children.push(h("div.empty", "No GPU publishes a hwmon power cap."));
+    children.push(h("div.empty", "No GPU reports a controllable power limit. Check GPU detection in Setup if you expected one."));
   }
   put(card, ...children);
 }
 
-/** advPowerRow is one row of the power table: the cap of the card, the
- *  range the service allows and the control that sets the desired cap. The
- *  value is clamped to the range of the card before it is written. */
+/** Editing inputs does not write; only Save limit can apply the target. */
 function advPowerRow(g, installed, view) {
   const wanted = g.effective_w != null ? g.effective_w : (g.desired_w != null ? g.desired_w : g.cap_w);
   const min = g.min_w || 1;
@@ -84,6 +76,8 @@ function advPowerRow(g, installed, view) {
     disabled: !installed, "aria-label": "GPU " + g.hip_index + " desired watts",
   });
   range.addEventListener("input", () => { number.value = range.value; });
+  number.addEventListener("input", () => { range.value = number.value; });
+  const save = h("button.small", { type: "button", disabled: !installed }, "Save limit");
   const apply = async () => {
     let watts = Number(number.value);
     if (!Number.isFinite(watts)) {
@@ -93,23 +87,24 @@ function advPowerRow(g, installed, view) {
     watts = Math.max(min, Math.min(max, watts));
     number.value = String(watts);
     range.value = String(watts);
+    if (!confirm("Set GPU " + g.hip_index + " to a desired limit of " + watts + " W? The service applies this limit, affecting power draw and performance.")) return;
+    save.disabled = true;
     await advSavePower(g.hip_index, watts, view);
+    save.disabled = false;
   };
-  range.addEventListener("change", apply);
-  number.addEventListener("change", apply);
+  save.addEventListener("click", apply);
   const drift = g.drift ? h("span.badge.b-warn", "drift") : h("span.badge.b-ok", "in sync");
   const desired = g.desired_w == null ? "–" : Math.round(g.desired_w) + " W";
   return h("tr", { "data-power-gpu": String(g.hip_index) },
     h("td", "GPU " + g.hip_index),
-    h("td", Math.round(g.cap_w) + " W"),
+    h("td", g.cap_w == null ? "not reported" : Math.round(g.cap_w) + " W"),
     h("td", Math.round(min) + "–" + Math.round(max) + " W"),
     h("td", desired),
-    h("td", h("div.row", range, number)),
+    h("td", h("div.row", range, number, save)),
     h("td", drift));
 }
 
-/** advSavePower writes the desired cap of one card. The service clamps the
- *  value to the range of the card; the answer says what it did. */
+/** Save the target, then read back the service's clamped result. */
 async function advSavePower(gpu, watts, view) {
   try {
     const answer = await api("/api/power", { method: "PUT", body: { gpu, watts } });

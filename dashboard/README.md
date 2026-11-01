@@ -50,6 +50,10 @@ flowchart LR
 - The page is plain HTML, CSS and JavaScript. It is embedded in the binary.
   There is no build step, no npm and no framework.
 
+For embedded use, `dashboard.Start` waits for `Options.Ready` to finish before
+returning. `Handle.Wait` reports shutdown even if cancellation happens inside
+the readiness callback.
+
 ## Files
 
 | Path | Job |
@@ -95,7 +99,7 @@ Regenerate the table rows with `scripts/check-web.sh --print-globals`.
 | File | Published globals |
 |---|---|
 | `dashboard/web/components/cards.js` | `jsonLink`, `cardHead`, `stateHead`, `setHead`, `factRow`, `tableHead`, `tableCaption`, `emptyState`, `sectionLabel`, `PILL_ICON`, `statePill`, `loading`, `failed` |
-| `dashboard/web/components/charts.js` | `chartMinMax`, `chartNumbers`, `chartSame`, `chartPaths`, `chartPointer`, `chartNice`, `sparkDomain`, `chartDataTable`, `spark`, `areaChart`, `ring`, `meter` |
+| `dashboard/web/components/charts.js` | `chartMinMax`, `chartNumbers`, `chartSame`, `chartPaths`, `chartPointer`, `chartNice`, `sparkDomain`, `chartDataTable`, `spark`, `areaChart` |
 | `dashboard/web/components/command.js` | `copyBtn`, `cmdBlock`, `connectEndpoint`, `connectSnippet` |
 | `dashboard/web/components/compare.js` | `NO_VERDICT`, `svgEl`, `ladderPoints`, `compareCellName`, `compareSpread`, `compareBandText`, `compareSpreadText`, `compareChipText`, `compareChipWidth`, `compareChip`, `compareBlock`, `compareScale`, `compareTable`, `compareChart`, `curveSmallMultiples`, `curveTable` |
 | `dashboard/web/components/gputable.js` | `gpuValueTable` |
@@ -103,11 +107,11 @@ Regenerate the table rows with `scripts/check-web.sh --print-globals`.
 | `dashboard/web/components/timeline.js` | `TIMELINE_STATE_WORD`, `TIMELINE_MARK`, `TIMELINE_PILL`, `stepTimeline`, `stepCurrentID`, `stepRow`, `stepPill`, `stepMark`, `stepSummary`, `stepActionLabel`, `stepAction`, `stepProgressNode`, `stepBar`, `stepProblem`, `stepToggleLog` |
 | `dashboard/web/js/boot.js` | `VIEWS`, `OLD_ROUTES`, `TAB_SCRIPTS`, `TAB_CSS`, `tabReady`, `tabLoading`, `loadScript`, `loadStyle`, `openTab`, `parseHash`, `route`, `preparePanel`, `focusSection`, `tabsKey`, `pendingG`, `shortcutsKey`, `boot` |
 | `dashboard/web/js/core.js` | `h`, `add`, `put`, `$`, `GiB`, `bytes`, `num`, `ago`, `badge`, `sh`, `SVG_NS`, `chartSvg` |
-| `dashboard/web/js/data.js` | `HISTORY`, `RUN_POLL_MS`, `MAX_POLL_MS`, `STALE_MS`, `state`, `request`, `api`, `loadHW`, `runsOf`, `runURL`, `pushHist`, `slowAgeNote`, `openTelemetry`, `openRunLogs`, `openJobEvents`, `openBenchEvents`, `JOB_POLL_MS`, `watchBenchJob`, `apiText`, `frameJobs`, `frameHandle`, `frameFallback`, `FRAME_FALLBACK_MS`, `runFrameJobs`, `onFrame`, `frameSubs`, `onTabFrame`, `telemetryStream`, `pollTimer`, `pollDelay`, `pollCycle`, `startTelemetry`, `pollRuns`, `pollCounts`, `schedulePoll`, `startPolling`, `refreshHost` |
-| `dashboard/web/js/shell.js` | `ADVANCED_KEY`, `toastTimer`, `toast`, `copyText`, `copy`, `copySource`, `tipPanel`, `openTip`, `tooltip`, `closeTip`, `setTabCount`, `SHORTCUT_KEY`, `SHORTCUTS`, `shortcutsOn`, `setShortcuts`, `shortcutsText`, `advancedOn`, `applyAdvanced`, `applyAdvancedToNew`, `toggleAdvanced`, `setRunPill`, `setPillAge`, `phaseSentence`, `demoBanner` |
+| `dashboard/web/js/data.js` | `HISTORY`, `RUN_POLL_MS`, `MAX_POLL_MS`, `STALE_MS`, `state`, `request`, `api`, `loadHW`, `runsOf`, `runURL`, `pushHist`, `slowAgeNote`, `openTelemetry`, `openRunLogs`, `openJobEvents`, `openBenchEvents`, `JOB_POLL_MS`, `watchBenchJob`, `apiText`, `frameJobs`, `frameHandle`, `frameFallback`, `FRAME_FALLBACK_MS`, `runFrameJobs`, `onFrame`, `frameSubs`, `onTabFrame`, `telemetryStream`, `pollTimer`, `pollDelay`, `pollCycle`, `presentTelemetry`, `setLivePaused`, `startTelemetry`, `pollRuns`, `pollCounts`, `schedulePoll`, `startPolling`, `refreshHost` |
+| `dashboard/web/js/shell.js` | `ADVANCED_KEY`, `toastTimer`, `toast`, `copyText`, `copy`, `copySource`, `tipPanel`, `openTip`, `tooltip`, `closeTip`, `setTabCount`, `SHORTCUT_KEY`, `SHORTCUTS`, `shortcutsOn`, `setShortcuts`, `shortcutsText`, `advancedOn`, `applyAdvanced`, `toggleAdvanced`, `setRunPill`, `setPillAge`, `phaseSentence`, `demoBanner` |
 | `dashboard/web/js/theme.js` | `THEME_KEY`, `THEME_CHOICES`, `themeChoice`, `systemDark`, `applyTheme`, `setTheme`, `watchSystemTheme` |
 | `dashboard/web/views/advanced/console.js` | `adv`, `viewAdvanced`, `advLoad`, `advReload`, `advPaint`, `advHead`, `advSubscribe`, `advRunsTable`, `advCardListText`, `advCopyCardList`, `advServerMeasures` |
-| `dashboard/web/views/advanced/doctor.js` | `advDoctorReport`, `advToolsCard`, `advToolsEcc`, `advDoctorCheck` |
+| `dashboard/web/views/advanced/doctor.js` | `advDoctorReport`, `advToolsCard`, `advDoctorCheck` |
 | `dashboard/web/views/advanced/documents.js` | `advDocuments`, `advLoadDocuments`, `advDocument` |
 | `dashboard/web/views/advanced/jobs.js` | `advJobList`, `advJobState` |
 | `dashboard/web/views/advanced/prefs.js` | `advPrefsCard`, `prefsList`, `prefRow`, `setResolved`, `savePref` |
@@ -116,10 +120,10 @@ Regenerate the table rows with `scripts/check-web.sh --print-globals`.
 | `dashboard/web/views/benchmark/benchmark.js` | `benchState`, `benchSection`, `benchFailed`, `benchResults`, `benchSuiteLine`, `benchCards`, `benchCellName`, `benchBestCell`, `benchHeadline`, `benchResultBody`, `benchCopy`, `benchReceipt`, `benchStartError`, `cancelBench`, `deleteBenchResult`, `viewBenchmark` |
 | `dashboard/web/views/benchmark/suites.js` | `benchSuiteCells`, `benchSuiteEstS`, `benchMinutes`, `benchSuiteCard`, `benchSuiteCards`, `benchSentence`, `benchProgress`, `benchBest`, `benchSuiteOf`, `benchHistoryRow`, `benchHistory`, `benchAB`, `benchAdvanced` |
 | `dashboard/web/views/chat/chat.js` | `chatState`, `viewChat` |
-| `dashboard/web/views/dashboard/dashboard.js` | `dash`, `dashSection`, `dashInfo`, `dashGroup`, `dashPush`, `dashSeries`, `dashCardSeries`, `dashCardName`, `dashLiveRun`, `dashPhase`, `dashLoad`, `dashUpdateSimple`, `dashHistory`, `dashWindowSeries`, `viewDashboard`, `dashSample` |
+| `dashboard/web/views/dashboard/dashboard.js` | `dash`, `dashSection`, `dashInfo`, `dashPush`, `dashSeries`, `dashLiveRun`, `dashRunStatus`, `dashPhase`, `dashLoad`, `dashUpdateSimple`, `dashHistory`, `dashWindowSeries`, `viewDashboard`, `dashSample` |
 | `dashboard/web/views/dashboard/details.js` | `DASH_DETAIL_WINDOWS`, `dashDetails`, `dashLoadDetails`, `dashDetailsRead`, `dashDetailsWindow`, `dashWindowMinutes`, `dashDetailsPower`, `dashDetailsDocuments` |
-| `dashboard/web/views/dashboard/gpus.js` | `dashTile`, `dashCard`, `dashEcc`, `dashCards`, `renderGPUs`, `dashSubscribe` |
-| `dashboard/web/views/dashboard/simple.js` | `dashSimpleHero`, `dashStopRun`, `dashMeaning`, `dashSimpleTiles`, `dashSimpleCharts`, `dashSimpleMachine`, `dashBuildSimple`, `dashSimpleConnect` |
+| `dashboard/web/views/dashboard/gpus.js` | `dashTile`, `dashEcc`, `dashGPUOverview`, `renderGPUs`, `dashSubscribe` |
+| `dashboard/web/views/dashboard/simple.js` | `dashSimpleHero`, `dashEngineConfig`, `dashStopRun`, `dashMeaning`, `dashSimpleTiles`, `dashSimpleCharts`, `dashSimpleMachine`, `dashBuildSimple`, `dashSimpleConnect` |
 | `dashboard/web/views/fleet/fleet.js` | `FLEET_STATE_WORD`, `fleetStatePill`, `fleetGPUs`, `fleetRow`, `fleetShare`, `viewFleet` |
 | `dashboard/web/views/logs/advanced.js` | `logsJsonLink`, `logsAdvanced` |
 | `dashboard/web/views/logs/findings.js` | `logPill`, `logSeverityPill`, `logFixIsCommand`, `logFinding`, `logFindings` |
@@ -131,14 +135,14 @@ Regenerate the table rows with `scripts/check-web.sh --print-globals`.
 | `dashboard/web/views/setup/chooser.js` | `setupRecipeCard`, `setupPaintRecipeList`, `setupSelectRecipe`, `setupPaintRecipeSelection` |
 | `dashboard/web/views/setup/facts.js` | `paintSetupFacts`, `setupFactList`, `setupFact`, `setupFactsFromHost`, `setupMemoryWhy`, `setupPlanSentence`, `setupLoadHW`, `setupLoadDoctorReport` |
 | `dashboard/web/views/setup/glossary.js` | `paintSetupGlossary` |
-| `dashboard/web/views/setup/headline.js` | `setupHeadline`, `setupServerEndpoint`, `setupHeadActions`, `setupNextRunnable`, `setupCurrentStep`, `setupRunNextStep`, `setupStartStep`, `setupExplainWait`, `setupWaitSentence`, `pathSteps`, `setupRootCommand`, `setupCopyNextCommand`, `setupCopyText`, `startSetupServer`, `focusSetupStep`, `focusSetupDoctor`, `focusSetupVerify`, `setupShowDetails` |
+| `dashboard/web/views/setup/headline.js` | `setupHeadline`, `setupServerEndpoint`, `setupHeadActions`, `setupCurrentStep`, `setupStartStep`, `setupExplainWait`, `setupWaitSentence`, `pathSteps`, `setupRootCommand`, `setupCopyNextCommand`, `setupCopyText`, `startSetupServer`, `focusSetupStep`, `focusSetupDoctor`, `focusSetupVerify`, `setupShowDetails` |
 | `dashboard/web/views/setup/launch-disclosure.js` | `setupPlanLaunchDisclosure` |
 | `dashboard/web/views/setup/needs-you.js` | `paintSetupNeedsYouRender`, `setupNeedsYouItem` |
 | `dashboard/web/views/setup/path.js` | `setupPathLoaded`, `setupRunPath`, `setupStopPath`, `setupAttachPath`, `setupRunRows`, `setupRunRow`, `setupRunRowDuration`, `setupRunStepStart`, `setupPaintRunRows`, `setupPaintPath`, `setupPythonEnv`, `setupVerifyAgain` |
-| `dashboard/web/views/setup/plan-adjust.js` | `setupPlanAdjustBody`, `setupPlanGPUSelector`, `setupPlanGPUSelected`, `setupApplyGPUSelection`, `setupClearGPUSelection`, `setupSaveDefaultButton`, `setupSaveDefaultNote`, `setupSaveDefaultMode` |
-| `dashboard/web/views/setup/recipes.js` | `loadSetupRecipes`, `setupRecipeOrder`, `setupRecipeError`, `setupRecommendedCard`, `setupRecommendedRecipe`, `setupFitStatus`, `setupFitLine`, `loadSetupPlan`, `setupEnsurePrefs`, `setupRecipe`, `setupPlanView`, `setupPlanLaunchBox`, `setupPlanActions`, `setupPlanReady`, `setupPlanCommand`, `setupQuote`, `setupPlanSettings`, `setupPlanAdjustments`, `setupPlanOverrides`, `setupPlanCommonOverrides`, `setupSetValue`, `setupApplyOverrides`, `setupPlanAdjust`, `setupPlanSaveDefaultButton`, `setupPlanSaveDefaultClick`, `setupSwitchMode`, `startSetupRecipe`, `paintSetupRecipeHint`, `setupRecommendationWhy`, `setupRecipeNote`, `setupRecipeLabel` |
+| `dashboard/web/views/setup/plan-adjust.js` | `setupPlanAdjustBody`, `setupPlanGPUSelector`, `setupPlanGPUSelected`, `setupApplyGPUSelection`, `setupClearGPUSelection`, `setupSaveDefaultNote`, `setupSaveDefaultMode` |
+| `dashboard/web/views/setup/recipes.js` | `loadSetupRecipes`, `setupRecipeOrder`, `setupRecipeError`, `setupRecommendedCard`, `setupRecommendedRecipe`, `setupFitStatus`, `setupFitLine`, `loadSetupPlan`, `setupEnsurePrefs`, `setupRecipe`, `setupPlanView`, `setupPlanLaunchBox`, `setupPlanCommand`, `setupQuote`, `setupPlanSettings`, `setupPlanAdjustments`, `setupPlanOverrides`, `setupPlanCommonOverrides`, `setupSetValue`, `setupApplyOverrides`, `setupPlanAdjust`, `setupPlanSaveDefaultButton`, `setupPlanSaveDefaultClick`, `setupSwitchMode`, `startSetupRecipe`, `paintSetupRecipeHint`, `setupRecommendationWhy`, `setupRecipeNote`, `setupRecipeLabel` |
 | `dashboard/web/views/setup/setup.js` | `SETUP_EXTRA_STEPS`, `SETUP_SMOKE_ENABLED`, `setupProgress`, `setupLogs`, `setupStreams`, `setupJobRead`, `setupState`, `viewSetup`, `setupEnsureModule`, `setupStartPath`, `loadSetupDocument`, `paintSetupHead`, `paintSetupStale`, `paintSetupError`, `paintSetupTimeline`, `paintSetupNeedsYou`, `setupStepLink`, `setupStepNote`, `setupEstimateNote`, `loadSetupDoctor`, `setupDoctorFinding`, `setupVerifyBox`, `setupServerRunning`, `setupServerServing`, `setupAskServer` |
-| `dashboard/web/views/setup/steps.js` | `runSetupStep`, `followSetupJob`, `loadSetupJobProgress`, `setupJobStart`, `setupApplyJobProgress`, `setupProgressPercent`, `setupProgressSentence`, `setupProgressDetail`, `setupElapsed`, `setupElapsedText`, `setupLiveDetail`, `setupRate`, `setupDuration`, `setupStartTicker`, `setupStopTicker`, `setupTick`, `setupTicker`, `attachSetupJobs`, `attachSetupJob`, `paintSetupProgress`, `setupRefreshRun`, `setupStopStreams` |
+| `dashboard/web/views/setup/steps.js` | `runSetupStep`, `followSetupJob`, `loadSetupJobProgress`, `setupJobStart`, `setupApplyJob`, `setupApplyJobProgress`, `setupProgressPercent`, `setupProgressSentence`, `setupProgressDetail`, `setupElapsed`, `setupElapsedText`, `setupLiveDetail`, `setupRate`, `setupDuration`, `setupStartTicker`, `setupStopTicker`, `setupTick`, `setupTicker`, `attachSetupJobs`, `attachSetupJob`, `paintSetupProgress`, `setupPaintLog`, `setupLastOutput`, `setupStopJob`, `setupRefreshRun`, `setupStopStreams` |
 | `dashboard/web/views/topology/advanced.js` | `topoBandwidth`, `topoAdvanced` |
 | `dashboard/web/views/topology/checklist.js` | `topoChecklist` |
 | `dashboard/web/views/topology/links.js` | `topoLegend`, `topoTree` |
@@ -212,8 +216,8 @@ Each tab answers one question. Keep it that way.
 | Advanced | What can I inspect and change on this host? | `/api/hw`, `/api/doctor`, `/api/power`, `/api/runs`, `/api/jobs`, `/api/telemetry` | write the power cap, re-check the host |
 
 The Advanced tab is the operator's console: the things about the host that
-belong to no single tab. It holds the exact per-GPU table (the same one the
-Dashboard tab shows in its details), the power caps with the only write of
+belong to no single tab. It holds the full per-GPU sensor table (the Dashboard
+shows a compact comparison and a device inspector), the power caps with the only write of
 the page, the ECC and the power tools (the exact commands of the reference's
 `tools/ecc.sh` and `tools/power.sh`, in the words of bernie; bernie never
 runs them as root), the doctor report in full (every category, every check),
@@ -224,6 +228,15 @@ the P2P checklist are on the Topology tab, and the known problems are on the
 Logs tab. It lives in `web/views/advanced/`, it reads the same `/api/*`
 answers and the shared telemetry stream, and it adds no endpoint. The old
 route `#classic` still lands on it.
+
+The Dashboard leads with the vLLM model/server identity, health and recorded
+launch settings: TP/PP, context limit, precision and quantization. Missing
+settings say “Not recorded”; GPU count is never used to infer parallelism.
+Output speed, prompt processing, active/queued requests, first-token latency
+and KV-cache use remain visible in Regular mode. GPU load and VRAM meters
+accompany exact per-device readings. On small screens, the same comparison
+rows become labeled cards; Inspect adds architecture, PCIe link, clocks and
+secondary temperatures without repeating the primary comparison.
 
 The Setup tab is the first tab. It opens with the state of the machine in one
 sentence, the facts of the host with the reason under every value, the
@@ -240,17 +253,61 @@ what bernie is checking and the card names the phase. A checklist that is
 older than its time to live is shown with the note that bernie is checking
 the host again.
 
-The Dashboard tab is the clear operational view. It opens with one hero:
-the state in one big word, the plain sentence, the endpoint with **Copy
-URL**, the Stop action and the output speed with its unit. Six plain-language
-tiles follow: prompt reading, active requests, first token, KV cache, prefix
-cache hits and draft accepted. Every tile has an `(i)` explanation from the
-shared glossary and a human subtitle; a value this host cannot measure is `–`
-and says `n/a on this host`. Two five-minute charts show the output and
-prompt rates, then come one card per GPU, **This machine** and **Connect an
-app** with copyable curl and Python requests. The Advanced tab keeps the
-fleet telemetry, the exact per-GPU table, the power controls, the topology
-and the raw documents.
+### Regular and Advanced interface modes
+
+The rail has an explicit **Regular / Advanced** control, independent of theme.
+Regular is the default. The choice reuses `bernie.advanced` in local storage;
+the page still works when storage is unavailable. Disclosures can be opened in
+either mode and keep their state when the mode changes, including during plan
+loading. Advanced exposes expert controls; it does not expand logs or JSON.
+
+Regular leads with the next action, compact host facts, progress and warnings.
+Setup keeps Stop outside disclosures, uses recorded timestamps for elapsed
+time, and never invents build percentages or an ETA. Installation and standalone
+environment-check records remain separate: passing a check does not repair a
+failed build. Raw errors, commands and saved output remain expandable.
+
+Dashboard shows the named server's readiness, output speed, prompt processing,
+active requests and first-token wait. Health and metrics are independent;
+missing metrics are not a startup state. Chat tests the oldest active server,
+matching the backend; multiple-server and unavailable-status messages explain
+that selection. Stop names the server; detaching an attached server leaves its
+process running. Advanced adds prefix-cache/speculation values and host-wide charts;
+recovery actions and explicit detail disclosures remain available in Regular.
+
+GPU comparison follows the engine metrics. Each visible GPU shows activity,
+used/total VRAM, temperature, power and warnings. Inspect opens its architecture,
+PCIe link, clocks, secondary temperatures, ECC evidence and activity history.
+Single-GPU inspection opens initially; multi-GPU inspection is on demand.
+Rows retain physical-device order, selection and keyboard focus during updates;
+removal or PCI identity replacement clears selection instead of retargeting it.
+The same component supplies the full Tools table; no parallel GPU-card renderer.
+
+Detected GPUs (GPU links), visible GPUs (inventory) and configured plan selection
+are separate scopes. Activity includes other host workloads, not exclusive server
+ownership. Mixed capacities are reported per GPU; unknown capacity is not zero.
+Inventory size does not imply a valid tensor-parallel size: recipes still choose
+model-supported layouts. Browser fixtures cover counts 1–10 at 1440, 1365, 390 and
+320 px in both modes and themes. Important readings stay 16 px; desktop tables
+scroll locally, while mobile uses labeled cards without a separate renderer.
+
+**Pause live values / Resume live values** freezes shared GPU/server metric
+refresh, not serving. Server health, Stop/Detach and background job/log streams
+continue. A timestamped banner identifies the snapshot. The preference is
+session-only; resume renders the latest shared sample without a new stream.
+
+`gpuValueTable` retains its three-argument full-table API. Its optional fourth
+construction argument selects `{compact, controls, onInspect}`. `update` accepts
+optional freshness metadata `{stale, paused, slowNote, inventoryKnown}`; the
+overview also uses `items()`, `select(key)` and `selected()` for one inspector.
+
+**GPU links** separates reported connectivity, readiness and measured speed.
+**Tools** groups host work into Diagnose, Inspect, Change and Share, with
+blocking checks first. These labels retain the `#topology` and `#advanced`
+routes and their section links. Both tabs remain reachable in either mode.
+
+Headlines use non-italic Inter at 28–42 px; body text is 16 px and secondary
+text 14 px. Mobile keeps the mode controls and all eight tabs reachable.
 
 A step that bernie can do has a Run button. The step runs in the background
 and its output goes under the step. A step that needs root has the command

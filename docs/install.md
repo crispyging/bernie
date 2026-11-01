@@ -74,6 +74,13 @@ by your user, the script says so and prints the exact command to run with
 | `--dry-run` | Print the plan (target, destination, download URL) and stop. Nothing is downloaded or written. |
 | `-h`, `--help` | Print the help. |
 
+`--start` launches the dashboard after installation. `--listen` and `--no-lan`
+only select its address; they do not launch it by themselves. IPv4 loopback,
+`[::1]:7860` and `localhost:7860` are local-only; a non-loopback address gets an
+exposure warning. If dashboard startup fails, the binary remains installed
+and the installer reports the dashboard command's exit status. Retry with
+`bernie dash start` after resolving the startup error.
+
 ### Settings (environment variables)
 
 A flag wins over the variable of the same meaning.

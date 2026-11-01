@@ -1,29 +1,10 @@
-// Shared chart primitives: the sparkline, the area chart, the busy ring and
-// the meter. Every drawing is an inline SVG built with createElementNS; there
-// is no chart library, no canvas and no image.
-//
-// The measured geometry of the drawings (the 120 x 34 sparkline, the 84 px
-// ring, the axis of the area chart) follows the reference UI.
+// Shared SVG sparklines and single-series area charts, built once and updated.
+// Missing samples stay gaps; keyboard readouts and data tables expose values.
 // Adapted from vllm-rdna-dash by CrispyGinger, used with permission.
-//
-// Accessibility: every chart says its numbers in words (the aria-label, the
-// text beside it and the table under it), the two charts with a readout can
-// be reached with the keyboard and the arrow keys move that readout, and a
-// number that was not measured is a dash, never a zero.
-//
-// A chart is built once and then updated: a frame writes the path of a
-// series and moves the labels, it never builds a node again.
 "use strict";
 
-// The one helper of the drawings lives in core.js: the charts of the
-// Dashboard tab and the charts of the Classic tab share it.
 
-/** chartMinMax keeps at most max points of a series and never loses a
- *  peak: the series is split into buckets and every bucket keeps its
- *  lowest and its highest value, in the order of the window. A series that
- *  already fits is kept as it is: the history of the server arrives
- *  downsampled. points holds {v} points; a point without a value is a gap
- *  and stays a gap. */
+/** Downsample {v} points by ordered bucket minima/maxima; empty buckets stay gaps. */
 function chartMinMax(points, max) {
   if (!points || points.length <= max) return points || [];
   const n = points.length;
@@ -57,19 +38,14 @@ function chartNumbers(values) {
   return out;
 }
 
-/** chartSame says whether two lists of numbers hold the same values. A
- *  chart is repainted from the same document every frame; the comparison
- *  keeps that frame free of writes. */
+/** Avoid DOM writes for unchanged series. */
 function chartSame(a, b) {
   if (!a || !b || a.length !== b.length) return false;
   for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
   return true;
 }
 
-/** chartPaths builds the line and the area of a series. A missing point
- *  breaks the line: the gap in the data is a gap in the chart, never a
- *  zero. points holds plain numbers or {v} objects; px and py map an index
- *  and a value to the canvas; baseY closes the area (null for a line). */
+/** Numeric or {v} samples; unknown points break paths. baseY closes the area. */
 function chartPaths(points, px, py, baseY) {
   let line = "";
   let area = "";
@@ -100,11 +76,7 @@ function chartPaths(points, px, py, baseY) {
   return { line: line, area: area };
 }
 
-/** chartPointer wires the pointer and the keyboard of a chart: the pointer
- *  moves the readout and the arrow keys move it too. The index -1 means that
- *  nothing is pointed at. The count is read when the pointer moves, not when
- *  the chart is built: a chart is built empty and filled later, so the
- *  number of points is only known then. */
+/** Pointer and keyboard share a live point count; index -1 clears the readout. */
 function chartPointer(svg, count, onIndex) {
   let index = -1;
   const total = () => {
@@ -136,8 +108,7 @@ function chartPointer(svg, count, onIndex) {
   });
 }
 
-/** chartNice rounds a number up to 1, 2 or 5 times a power of ten: the top
- *  of a scale is a round number, so two charts can be compared by eye. */
+/** Round scale maxima up to 1, 2 or 5 times a power of ten. */
 function chartNice(v) {
   if (!(v > 0)) return 1;
   const e = Math.pow(10, Math.floor(Math.log10(v)));
@@ -146,10 +117,7 @@ function chartNice(v) {
   return m * e;
 }
 
-/** sparkDomain is the scale of one sparkline: the top of the scale is the
- *  limit of the measure when the caller names one, else the largest number
- *  that was measured, rounded up to a round number. The paint and the
- *  pointer read the same domain, so the dot sits on the line. */
+/** Drawing and pointer share a fixed limit or a rounded sample maximum. */
 function sparkDomain(values, max) {
   let top = 0;
   for (const v of values || []) {
@@ -161,10 +129,7 @@ function sparkDomain(values, max) {
   return { min: 0, max: top > 0 ? top : 1, fixed: fixed };
 }
 
-/** chartDataTable builds the table that holds the numbers of a chart: one
- *  row per point, the unit in the head and the caption in words. The rows
- *  are built once and then written: a frame never builds a node, and the
- *  numbers of the chart are always in the page as text. */
+/** Accessible text values, with pooled rows grown as the history fills. */
 function chartDataTable(caption, head, summary) {
   const box = h("details", { class: "chart-data" });
   const table = h("table", { class: "chart-data-table" });
@@ -220,10 +185,7 @@ function chartDataTable(caption, head, summary) {
   return box;
 }
 
-/** spark draws the last minute of one number as a small line under a tile.
- *  values is the series, max the top of the scale and label the text a screen
- *  reader reads. The element carries an update method: the caller repaints it
- *  with the next sample instead of building it again. */
+/** Reusable sparkline: update(next, max) repaints without replacing controls. */
 function spark(values, max, label, opts) {
   const W = 120, H = 34, PAD = 2;
   const options = opts || {};
@@ -331,10 +293,7 @@ function spark(values, max, label, opts) {
   return wrap;
 }
 
-/** areaChart draws one measure over a window: the load, the power, the memory
- *  or the tokens per second. series is the list of values or the list of
- *  {t, v} points; opts carries the title, the unit, the window and the empty
- *  copy. The element carries an update method. */
+/** A numeric history with gaps, keyboard readout and a text table. */
 function areaChart(input, opts) {
   const options = opts || {};
   const W = 320, H = 170, L = 34, R = 312, T = 8, B = 128;
@@ -352,10 +311,9 @@ function areaChart(input, opts) {
   const xlab = chartSvg("g", { class: "chart-axis" });
   const area = chartSvg("path", { class: "chart-area" });
   const line = chartSvg("path", { class: "chart-line-strong" });
-  const extra = chartSvg("g", { class: "chart-extra" });
   const cross = chartSvg("line", { y1: T, y2: B, class: "chart-cross" });
   const dot = chartSvg("circle", { r: 3.5, class: "chart-dot" });
-  svg.append(grid, area, line, extra, cross, dot, ylab, xlab);
+  svg.append(grid, area, line, cross, dot, ylab, xlab);
   // The grid and the axes are built once. A frame writes the path of a
   // series and moves the labels; it never builds the axis tree again.
   const yLabels = [];
@@ -383,60 +341,15 @@ function areaChart(input, opts) {
     "The numbers of the chart");
   box.append(head, svg, empty, table);
 
-  const norm = (input) => {
-    const out = [];
-    for (const p of input || []) {
-      if (Array.isArray(p)) out.push({ t: null, v: p[1] });
-      else if (p && typeof p === "object") out.push({ t: p.t || p.time || null, v: typeof p.v === "number" ? p.v : p.value });
-      else if (typeof p === "number") out.push({ t: null, v: p });
-      else out.push({ t: null, v: null });
-    }
-    // A missing point stays in the series: the chart breaks the line there
-    // instead of drawing a zero. The series is capped at 240 points and
-    // the cap never loses a peak.
-    return chartMinMax(out, 240);
-  };
-  // The chart takes one series (a list of values or points) or a list of
-  // series: {values, label, dash}. A second series gets its own line, its
-  // own dash pattern and its own word on the chart, so a reader who cannot
-  // see the colours still knows which line is which.
-  const seriesOf = (input) => {
-    const many = Array.isArray(input) && input.length && input[0] && typeof input[0] === "object" &&
-      !Array.isArray(input[0]) && input[0].values !== undefined;
-    const list = many ? input : [null];
-    return list.map((one) => ({
-      points: norm(one ? one.values : input),
-      label: one && one.label ? one.label : "",
-      dash: !!(one && one.dash),
-    }));
-  };
-
-  let series = [];
-  // The scale of the chart: the fixed maximum of the measure when there is
-  // one, else the largest number that was measured. The paint and the
-  // pointer read it, so the dot sits on the line.
-  let maxV = 1;
-  // The scale and the window the labels show: they are written when they
-  // move, not on every frame.
-  let scaleV = 0;
-  let windowM = 0;
-  // The path and the word of every second series: they are built once and
-  // then written.
-  const extraPaths = [];
-  const extraLabels = [];
+  const norm = (values) => chartMinMax((values || []).map((v) => ({
+    v: Number.isFinite(v) ? v : null,
+  })), 240);
+  let points = norm(input);
+  let maxV = 1, scaleV = 0, windowM = 0;
   const paint = () => {
-    let n = 1;
     let top = 0;
-    for (const one of series) {
-      if (one.points.length > n) n = one.points.length;
-      for (const p of one.points) {
-        const v = p.v;
-        if (typeof v === "number" && isFinite(v) && v > top) top = v;
-      }
-    }
-    maxV = options.max && options.max > 0 ? options.max : (top > 0 ? top : 1);
-    const px = (i) => (n > 1 ? L + (i * (R - L)) / (n - 1) : (L + R) / 2);
-    const py = (v) => B - (Math.min(v, maxV) / maxV) * (B - T);
+    for (const p of points) if (Number.isFinite(p.v) && p.v > top) top = p.v;
+    maxV = options.max > 0 ? options.max : top || 1;
     if (maxV !== scaleV) {
       yLabels[0].textContent = "0";
       yLabels[1].textContent = num(maxV / 2, maxV < 10 ? 1 : 0);
@@ -450,201 +363,49 @@ function areaChart(input, opts) {
       xLabels[2].textContent = "now";
       windowM = mins;
     }
-    const first = series[0];
-    if (!first || !first.points.length) {
-      line.setAttribute("d", "");
-      area.setAttribute("d", "");
-      empty.hidden = false;
-      return;
-    }
-    empty.hidden = true;
-    const used = [];
-    for (let idx = 0; idx < series.length; idx++) {
-      const one = series[idx];
-      if (!one.points.length) continue;
-      // A missing point breaks the line: the gap in the data is a gap in
-      // the chart, never a zero.
-      const seg = chartPaths(one.points, px, py, idx === 0 ? B : null);
-      if (idx === 0) {
-        line.setAttribute("d", seg.line);
-        area.setAttribute("d", seg.area);
-      } else {
-        let path = extraPaths[idx - 1];
-        if (!path) {
-          path = chartSvg("path", { class: one.dash ? "chart-line-dash" : "chart-line-alt" });
-          extraPaths[idx - 1] = path;
-          extra.append(path);
-        }
-        path.setAttribute("d", seg.line);
-      }
-      if (!one.label) continue;
-      let label = extraLabels[idx - 1];
-      if (!label) {
-        label = chartSvg("text", { class: "chart-series-label", "text-anchor": "end" });
-        extraLabels[idx - 1] = label;
-        extra.append(label);
-      }
-      let last = 0;
-      for (let k = one.points.length - 1; k >= 0; k--) {
-        const v = one.points[k].v;
-        if (typeof v === "number" && isFinite(v)) { last = v; break; }
-      }
-      let y = py(last) - 5;
-      while (used.some((u) => Math.abs(u - y) < 11)) y -= 11;
-      used.push(y);
-      label.setAttribute("x", R - 2);
-      label.setAttribute("y", y);
-      label.textContent = one.label;
-    }
+    empty.hidden = points.length > 0;
+    const px = (i) => points.length > 1 ? L + i * (R - L) / (points.length - 1) : (L + R) / 2;
+    const py = (v) => B - Math.min(v, maxV) / maxV * (B - T);
+    const paths = chartPaths(points, px, py, B);
+    line.setAttribute("d", paths.line);
+    area.setAttribute("d", paths.area);
   };
-  const fmt = (p) => (options.format ? options.format(p.v) : num(p.v)) + (options.unit ? " " + options.unit : "");
-  const at = (i) => series.map((one) => {
-    const p = one.points[i];
-    if (!p) return null;
-    return (one.label ? one.label + " " : "") + fmt(p);
-  }).filter(Boolean).join(" · ");
+  const fmt = (p) => Number.isFinite(p.v)
+    ? (options.format ? options.format(p.v) : num(p.v)) + (options.unit ? " " + options.unit : "") : "–";
   const show = (i) => {
-    if (i < 0 || !series.length || !series[0].points.length) {
-      read.textContent = series[0] && series[0].points.length ? at(series[0].points.length - 1) : "";
-      cross.setAttribute("opacity", "0");
-      dot.setAttribute("opacity", "0");
+    cross.setAttribute("opacity", "0");
+    dot.setAttribute("opacity", "0");
+    if (i < 0) {
+      read.textContent = points.length ? fmt(points[points.length - 1]) : "";
       return;
     }
-    const p = series[0].points[i];
-    let n = 1;
-    for (const one of series) if (one.points.length > n) n = one.points.length;
-    const px = (n > 1 ? L + (i * (R - L)) / (n - 1) : (L + R) / 2);
-    const py = B - (Math.min(p.v, maxV) / maxV) * (B - T);
-    cross.setAttribute("x1", px.toFixed(1));
-    cross.setAttribute("x2", px.toFixed(1));
+    const p = points[i];
+    if (!p) return;
+    read.textContent = fmt(p);
+    if (!Number.isFinite(p.v)) return;
+    const x = points.length > 1 ? L + i * (R - L) / (points.length - 1) : (L + R) / 2;
+    const y = B - Math.min(p.v, maxV) / maxV * (B - T);
+    cross.setAttribute("x1", x.toFixed(1));
+    cross.setAttribute("x2", x.toFixed(1));
     cross.setAttribute("opacity", "1");
-    dot.setAttribute("cx", px.toFixed(1));
-    dot.setAttribute("cy", py.toFixed(1));
+    dot.setAttribute("cx", x.toFixed(1));
+    dot.setAttribute("cy", y.toFixed(1));
     dot.setAttribute("opacity", "1");
-    read.textContent = at(i);
   };
-  // The rows of the table: the same numbers as the drawing.
-  const rows = () => {
-    const out = [];
-    const n = series.length ? series[0].points.length : 0;
-    for (let i = 0; i < n; i++) {
-      const row = [String(i + 1)];
-      for (const one of series) {
-        const p = one.points[i];
-        row.push(p && typeof p.v === "number" && isFinite(p.v) ? fmt(p) : "–");
-      }
-      out.push(row);
-    }
-    return out;
-  };
-  series = seriesOf(input);
-  paint();
-  chartPointer(svg, () => (series[0] ? series[0].points.length : 0), show);
+  chartPointer(svg, () => points.length, show);
   let first = true;
   box.update = (next, mins) => {
     if (mins) options.windowMinutes = mins;
-    const nextSeries = seriesOf(next);
-    // The document of a frame is often the one of the frame before: the
-    // chart then writes nothing at all.
-    const same = nextSeries.length === series.length && nextSeries.every((one, i) => {
-      const old = series[i];
-      if (one.label !== old.label || one.dash !== old.dash) return false;
-      if (one.points.length !== old.points.length) return false;
-      for (let k = 0; k < one.points.length; k++) if (one.points[k].v !== old.points[k].v) return false;
-      return true;
-    });
+    const incoming = norm(next);
+    const same = incoming.length === points.length && incoming.every((p, i) => p.v === points[i].v);
     if (!first && same && (options.windowMinutes || 5) === windowM) return;
     first = false;
-    series = nextSeries;
+    points = incoming;
     paint();
-    const last = series[0] && series[0].points.length ? series[0].points.length - 1 : -1;
-    svg.setAttribute("aria-label", (options.title || "the measure") + ": " + (last >= 0 ? at(last) : "no sample yet"));
+    svg.setAttribute("aria-label", name + ": " + (points.length ? fmt(points[points.length - 1]) : "no sample yet"));
     show(-1);
-    table.update(rows());
+    table.update(points.map((p, i) => [String(i + 1), fmt(p)]));
   };
   box.update(input);
-  return box;
-}
-
-/** ring draws the load of one card: the track, the arc, the number in the
- *  middle and the name of the card under it. A card that does not report its
- *  load shows a dash, never a zero. The element carries an update method. */
-function ring(pct, label, opts) {
-  // A horizontal 0-100% bar. The old donut sat at 84 px and crowded the card;
-  // the bar reads the same number with the same words.
-  const box = h("div.ring-wrap", { class: "ring-wrap" });
-  const num = h("div", { class: "ring-n" }, "–");
-  const track = h("div", { class: "ring-track", role: "img" });
-  const fill = h("i", { class: "ring-fill" });
-  const cap = h("div", { class: "ring-caption" }, label || "");
-  track.append(fill);
-  box.append(num, track, cap);
-  const paint = (v) => {
-    if (v == null || !isFinite(v)) {
-      fill.style.width = "0%";
-      num.textContent = "–";
-      track.setAttribute("aria-label", "the load of " + (label || "the card") + " is not published");
-      return;
-    }
-    const p = Math.max(0, Math.min(100, v));
-    fill.style.width = p.toFixed(1) + "%";
-    num.textContent = String(Math.round(p));
-    track.setAttribute("aria-label", "the load of " + (label || "the card") + ": " + Math.round(p) + " %");
-  };
-  paint(pct);
-  box.update = (v) => paint(v);
-  return box;
-}
-
-/** meter draws one value against its maximum: the name of the measure, the
- *  value with its unit, the track, the fill and the tick of the cap. A value
- *  that was not measured shows a dash and an empty track. The element carries
- *  an update method. */
-function meter(value, max, opts) {
-  const options = opts || {};
-  const box = h("div.metric");
-  const label = h("span", options.label || "");
-  const amount = h("b", "");
-  const head = h("div.lbl", label, amount);
-  const track = h("div.bar", { role: "img" });
-  const fill = h("i");
-  track.append(fill);
-  const tick = h("span", { class: "meter-tick" });
-  const wrap = h("div", { class: "meter-track-wrap" }, track, tick);
-  const note = h("div", { class: "meter-note" }, "");
-  box.append(head, wrap, note);
-
-  const paint = (v, m) => {
-    const unit = options.unit ? " " + options.unit : "";
-    const fmtV = options.format ? options.format(v) : num(v);
-    if (v == null || !isFinite(v)) {
-      amount.textContent = "–";
-      fill.style.width = "0%";
-      track.setAttribute("aria-label", (options.label || "the measure") + " is not published");
-      note.textContent = options.emptyNote || "";
-      return;
-    }
-    const scale = m && m > 0 ? m : (options.max || 0);
-    const cap = options.cap != null ? options.cap : scale;
-    const over = cap && v > cap;
-    const sep = options.sep || " / ";
-    const fmtM = options.format ? options.format(scale) : num(scale);
-    amount.textContent = scale ? fmtV + sep + fmtM + unit : fmtV + unit;
-    fill.style.width = scale ? Math.min(100, (v / scale) * 100).toFixed(1) + "%" : "0%";
-    track.classList.toggle("hot", !!over);
-    if (cap && scale) {
-      tick.style.display = "block";
-      tick.style.left = Math.min(100, (cap / scale) * 100).toFixed(1) + "%";
-    } else {
-      tick.style.display = "none";
-    }
-    track.setAttribute("aria-label", (options.label || "the measure") + ": " + fmtV + unit +
-      (scale ? " of " + fmtM + unit : "") + (over ? ", over the cap" : ""));
-    note.textContent = over ? (options.overNote || "over the cap") : (options.note || "");
-    if (over) note.style.color = "var(--serious)";
-    else note.style.color = "var(--muted)";
-  };
-  paint(value, max);
-  box.update = (v, m) => paint(v, m);
   return box;
 }

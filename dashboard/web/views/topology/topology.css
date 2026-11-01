@@ -17,10 +17,12 @@
   white-space: nowrap;
 }
 
+.topo-matrix tbody th, .topo-matrix thead th:first-child { position: sticky; left: 0; z-index: 1; background: var(--surface); }
+
 .topo-matrix-name,
 .topo-matrix-head {
   font-family: var(--font-mono);
-  font-size: 12px;
+  font-size: 14px;
   color: var(--muted);
 }
 
@@ -106,7 +108,7 @@
 
 .topo-bw-matrix .topo-cell-gbps {
   display: block;
-  font-size: 12px;
+  font-size: 16px;
   color: var(--text);
 }
 

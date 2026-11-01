@@ -1,10 +1,6 @@
-// The list of the recipes of the host: the reader opens it to pick
-// another one. The module comes with the button that opens it, so the
-// first paint does not carry it.
+// Alternative recipes, loaded when the chooser is opened.
 "use strict";
 
-/** setupRecipeCard is one radio card of the chooser: the name, the status,
- *  the cards it wants, its architecture and its fit. */
 function setupRecipeCard(recipe) {
   const input = h("input", {
     type: "radio",
@@ -18,21 +14,19 @@ function setupRecipeCard(recipe) {
     input,
     h("h3", recipe.name || recipe.id, recommended ? h("span.pill", "recommended") : null),
     recipe.description ? h("p.recipe-what", recipe.description) : null,
-    h("div.recipe-meta",
+    h("div.recipe-meta.advanced-only",
       h("span.recipe-status", recipe.status || ""),
       h("span.recipe-need", recipe.gpus ? recipe.gpus + " GPUs" : "any number of GPUs"),
       h("span.recipe-arch", (recipe.arch || []).join(", ") || "any architecture")),
     h("p.recipe-fit", { class: "recipe-fit fit-" + setupFitStatus(recipe) }, setupFitLine(recipe)),
     recommended ? h("p.small.muted", "recommended: " + setupRecommendationWhy(recipe)) : null);
 }
-/** setupPaintRecipeList paints the other recipes of the host: the reader
- *  opened the disclosure, so the list is here now. */
+/** Keep the chosen radio and its card in sync, including the recommendation. */
 function setupPaintRecipeList(box, recipes) {
   put(box, h("div.recipe-chooser", recipes.map(setupRecipeCard)));
   setupPaintRecipeSelection();
 }
 
-/** setupSelectRecipe picks a recipe and builds its plan again. */
 async function setupSelectRecipe(id) {
   setupState.recipeID = id;
   const recipe = (setupState.recipes && setupState.recipes.recipes || []).find((r) => r.id === id);
@@ -42,7 +36,6 @@ async function setupSelectRecipe(id) {
   setupPaintRecipeSelection();
   await loadSetupPlan();
 }
-/** setupPaintRecipeSelection marks the picked recipe in the chooser. */
 function setupPaintRecipeSelection() {
   const cards = setupState.recipeBox ? setupState.recipeBox.querySelectorAll(".recipe-card") : [];
   cards.forEach((card) => {

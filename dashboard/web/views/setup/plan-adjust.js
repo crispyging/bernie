@@ -1,22 +1,15 @@
-// "The GPUs and the settings of this plan" disclosure of the recipe plan.
-// Loaded lazily so the first paint stays under budget. Holds the GPU
-// selection (ia.md R44) and the "Save as default" button (ia.md R43).
-// Adapted from vllm-rdna-dash by CrispyGinger, used with permission.
+// Optional GPU selection and saved mode. Loaded with the plan disclosure.
 "use strict";
 
-/** setupPlanAdjustBody is the disclosure body: GPU checkboxes, a one-line
- *  note about settings, and the "Save as default" hint. The structured
- *  form lives in recipes.js; this owns plan-wide things. */
 function setupPlanAdjustBody() {
   return h("div.recipe-plan-adjust-body",
     setupPlanGPUSelector(),
     h("p.small.muted",
-      "Settings and reasons are in the list below. Re-running the plan after a change picks the new GPUs and rebuilds the command."),
+      "Settings below explain the effective plan. Changes update the preview, not an active server."),
     setupSaveDefaultNote());
 }
 
-/** setupPlanGPUSelector: checkbox list of GPUs bernie may use (ia.md R44).
- *  Sends env.HIP_VISIBLE_DEVICES=... — the same flag spec §7.7 accepts. */
+/** GPU selection uses the same env override as the CLI. */
 function setupPlanGPUSelector() {
   const detected = (setupState.hw && setupState.hw.gpus) || [];
   if (!detected.length) return null;
@@ -38,13 +31,11 @@ function setupPlanGPUSelector() {
   });
   return h("div.recipe-gpu-selector",
     h("h4", "GPUs allowed for this run"),
-    h("p.small.muted", "One checkbox per detected card. The selection writes env.HIP_VISIBLE_DEVICES in the plan and the launch command."),
+    h("p.small.muted", "Choose cards for the next run. Clearing every checkbox returns to the plan's default GPUs."),
     rows,
     h("button.small", { type: "button", onclick: setupClearGPUSelection }, "Use the plan's default GPUs"));
 }
 
-/** setupPlanGPUSelected: HIP indices the reader has checked. Reads live
- *  checkboxes so the selection survives the plan reload. */
 function setupPlanGPUSelected() {
   const box = setupState.planBox;
   if (!box) return [];
@@ -55,7 +46,6 @@ function setupPlanGPUSelected() {
   return out;
 }
 
-/** setupApplyGPUSelection writes env.HIP_VISIBLE_DEVICES=... and rebuilds. */
 async function setupApplyGPUSelection() {
   const prefix = "env.HIP_VISIBLE_DEVICES=";
   const sets = setupState.sets.filter((s) => !s.startsWith(prefix));
@@ -65,33 +55,19 @@ async function setupApplyGPUSelection() {
   await loadSetupPlan();
 }
 
-/** setupClearGPUSelection drops env.HIP_VISIBLE_DEVICES so the plan picks
- *  GPUs with the rule of spec §7.7. */
 async function setupClearGPUSelection() {
   setupState.sets = setupState.sets.filter((s) => !s.startsWith("env.HIP_VISIBLE_DEVICES="));
   await loadSetupPlan();
 }
 
-/** setupSaveDefaultButton: ghost button next to the mode switch. Renders
- *  only when the config knows "mode" (ia.md R43: "Save as default" only
- *  if the config key exists — checked against `bernie config show`). */
-function setupSaveDefaultButton() {
-  const keys = setupState.prefsKeys;
-  if (!Array.isArray(keys) || !keys.includes("mode")) return null;
-  const btn = h("button.small", { type: "button", onclick: setupSaveDefaultMode }, "Save the mode as default");
-  btn.title = "bernie config set mode " + setupState.mode;
-  return btn;
-}
 
-/** setupSaveDefaultNote: the only persistable field is mode. */
 function setupSaveDefaultNote() {
   const keys = setupState.prefsKeys;
   if (!Array.isArray(keys) || !keys.includes("mode")) return null;
   return h("p.small.muted",
-    "Save the mode as default persists across runs (bernie config set mode). Port, max context length, run name and model are per-run.");
+    "Only mode can be saved as a default here. Other settings apply to this run.");
 }
 
-/** setupSaveDefaultMode writes the current mode to the user defaults. */
 async function setupSaveDefaultMode() {
   try {
     await api("/api/prefs", { method: "PUT", body: { key: "mode", value: setupState.mode } });

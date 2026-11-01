@@ -1,41 +1,38 @@
 "use strict";
-// ---------- The jobs of the host ----------
-// The background actions bernie runs now: the steps of the setup path and
-// the path itself. A job that runs shows its phase; a job that failed keeps
-// its cause.
-
-/** advJobList is the card with the jobs of the host. */
+// Failures and their causes stay visible in both modes.
 function advJobList() {
   const card = h("div.card");
   const view = {
     el: card,
     update: (jobs) => {
       const list = jobs || [];
+      const error = (adv.errors || {})["/api/jobs"];
       if (!list.length) {
-        put(card, cardHead("The jobs", "/api/jobs"),
-          emptyState("No job has run on this host.",
-            "A job is one background action bernie runs now: a step of the setup path.",
-            "bernie status --steps"));
+        put(card, cardHead("Background work", "/api/jobs"),
+          emptyState(error ? "Background work could not be read." : "No background work is recorded.",
+            error ? "Re-check the host to try again; job status is unknown." : "Setup actions appear here with their progress or failure reason.",
+            "bernie status --steps"), error ? h("p.err", error) : null);
         return;
       }
+      const failed = list.filter((j) => j.state === "failed").length;
+      const running = list.filter((j) => j.state === "running").length;
       const rows = list.map((job) => h("tr",
-        h("td", job.id || "–"),
-        h("td", job.step || "–"),
+        h("td", job.step || "Background action"),
         h("td", advJobState(job.state)),
-        h("td", job.phase || job.error || "–"),
-        h("td", job.started_at ? ago(job.started_at) : "–")));
-      put(card,
-        cardHead("The jobs", "/api/jobs", h("span.small.muted", list.length + " jobs")),
-        h("div.scroll", h("table",
-          tableHead(["Job", "Step", "State", "Phase", "Since"]),
-          h("tbody", rows))));
+        h("td", job.error || job.phase || "No progress message"),
+        h("td", job.started_at ? ago(job.started_at) : "not recorded"),
+        h("td.advanced-only", job.id || "–")));
+      put(card, cardHead("Background work", "/api/jobs"),
+        h("p.small", failed + " failed · " + running + " in progress. Failed actions need review in Setup before retrying."),
+        h("div.scroll", h("table", h("thead", h("tr",
+          ["Action", "State", "Progress or reason", "Started"].map((label) => h("th", { scope: "col" }, label)),
+          h("th.advanced-only", { scope: "col" }, "Job ID"))), h("tbody", rows))));
     },
   };
   return view;
 }
 
-/** advJobState is the state of a job: the word of the spec and the mark that
- *  helps. The word carries the meaning. */
+/** A status always has a word as well as a colour. */
 function advJobState(state) {
   const kind = state === "running" ? "running" : state === "done" ? "done"
     : state === "failed" ? "fail" : "skip";

@@ -115,13 +115,13 @@
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 
   /* the scale of the type */
-  --display: clamp(38px, 6vw, 74px);
+  --display: clamp(28px, 4vw, 42px);
   --hero-number: 64px;
   --lede: 18px;
   --eyebrow: 12px;
   --section-label: 13px;
-  --body: 15px;
-  --small: 13px;
+  --body: 16px;
+  --small: 14px;
   --mono: 13px;
   --tile-number: 30px;
 

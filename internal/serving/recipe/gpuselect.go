@@ -37,6 +37,12 @@ func selectGPUs(r *Recipe, p *Plan, o PlanOptions) error {
 				if !gpu.ArchMatch(r.Requires.Arch, g.GFX) {
 					return fmt.Errorf("HIP_VISIBLE_DEVICES: GPU %d is %s; recipe %s needs %s", i, g.GFX, r.ID, strings.Join(r.Requires.Arch, ", "))
 				}
+				if r.Requires.VRAMGiB > 0 && float64(g.VRAMBytes) < r.Requires.VRAMGiB*gib {
+					if g.VRAMBytes == 0 {
+						return fmt.Errorf("HIP_VISIBLE_DEVICES: GPU %d has no reported VRAM capacity; recipe %s needs %g GiB per GPU", i, r.ID, r.Requires.VRAMGiB)
+					}
+					return fmt.Errorf("HIP_VISIBLE_DEVICES: GPU %d has %g GiB VRAM; recipe %s needs %g GiB per GPU", i, float64(g.VRAMBytes)/gib, r.ID, r.Requires.VRAMGiB)
+				}
 			}
 		}
 		if len(idx) != need {
@@ -50,14 +56,22 @@ func selectGPUs(r *Recipe, p *Plan, o PlanOptions) error {
 		return nil
 	}
 	var cand []int
+	matching := 0
 	for _, g := range o.GPUs {
 		if gpu.ArchMatch(r.Requires.Arch, g.GFX) {
-			cand = append(cand, g.HIPIndex)
+			matching++
+			if r.Requires.VRAMGiB <= 0 || float64(g.VRAMBytes) >= r.Requires.VRAMGiB*gib {
+				cand = append(cand, g.HIPIndex)
+			}
 		}
 	}
-	if len(cand) < need {
+	if matching < need {
 		return fmt.Errorf("recipe %s needs %d GPUs of %s; this host has %d (%s)", r.ID, need,
-			strings.Join(r.Requires.Arch, "/"), len(cand), archSummary(o.GPUs))
+			strings.Join(r.Requires.Arch, "/"), matching, archSummary(o.GPUs))
+	}
+	if len(cand) < need {
+		return fmt.Errorf("recipe %s needs %d GPUs of %s with at least %g GiB VRAM per GPU; %d of %d matching GPUs have enough reported capacity", r.ID, need,
+			strings.Join(r.Requires.Arch, "/"), r.Requires.VRAMGiB, len(cand), matching)
 	}
 	var sel []int
 	var reason string

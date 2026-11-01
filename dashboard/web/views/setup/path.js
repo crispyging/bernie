@@ -1,228 +1,223 @@
-// The one action of the Setup tab: it runs the whole path that bernie can
-// do on this host. The module comes when the reader presses the button, so
-// the first paint does not carry it.
+// Setup run and environment-check evidence. Loaded when needed.
 "use strict";
 
-// setupPathLoaded waits for steps.js to be there before this module uses
-// any of its functions. setupEnsureModule loads steps.js on the first call.
 const setupPathLoaded = setupEnsureModule("views/setup/steps.js");
 
-/** setupRunPath starts the whole path: the setup steps, the server and the
- *  check that proves it answers. It is one button and one job. */
 async function setupRunPath() {
   await setupPathLoaded;
-  setupProgress.path = { phase: "Starting\u2026", started: Date.now() };
+  if (Object.values(setupProgress).some((s) => s.running)) { toast("Wait for the current setup job, or stop it first."); return; }
+  setupProgress.path = { phase: "Starting setup…", started: Date.now(), running: true };
   setupLogs.path = [];
   setupStartTicker();
   setupPaintPath();
-  let job = null;
+  let job;
   try {
     job = await api("/api/onboarding/path/run", {
-      method: "POST",
-      body: { recipe: setupState.recipeID, mode: setupState.mode, set: setupState.sets },
+      method: "POST", body: { recipe: setupState.recipeID, mode: setupState.mode, set: setupState.sets },
     });
   } catch (e) {
-    setupProgress.path = { phase: "Failed: " + (e.message || e), failed: true };
+    Object.assign(setupProgress.path, { phase: "Setup could not start.", error: String(e.message || e), failed: true, running: false, ended: Date.now() });
     setupPaintPath();
     return;
   }
   if (!job || job.root_required) {
-    // The path stops at the step that needs root: the page shows the exact
-    // command and the Re-check that reads the host again.
-    setupProgress.path = {
-      phase: "This step needs root. Run the command below as root, then re-check.",
-      failed: true,
-      commands: (job && job.commands) || [],
-    };
+    Object.assign(setupProgress.path, { phase: "Administrator access is needed before setup can continue.", failed: true, running: false, ended: Date.now(), commands: job && job.commands || [] });
     setupPaintPath();
+    loadSetupDocument();
     return;
   }
-  setupState.pathJobID = job.id;
-  followSetupJob({ id: "path" }, job, { onRefresh: () => { setupRefreshRun("path"); loadSetupDocument(); } });
-  // One read so the headline says the box is being set up. Not per line:
-  // that is what used to storm the server.
+  followSetupJob({ id: "path" }, job, { onRefresh: () => loadSetupDocument() });
   loadSetupDocument();
   if (setupState.pathBox) setupState.pathBox.scrollIntoView({ behavior: "smooth", block: "center" });
 }
 
-/** setupStopPath stops the run of the path. The job ends and the tab says
- *  so; nothing is hidden. */
 async function setupStopPath() {
   await setupPathLoaded;
-  const id = setupState.pathJobID;
-  if (!id) return;
-  try {
-    await api("/api/jobs/" + encodeURIComponent(id) + "/stop", { method: "POST", body: {} });
-  } catch (e) {
-    toast("The run could not be stopped: " + (e.message || e));
-    return;
-  }
-  setupProgress.path = { phase: "Stopped.", failed: true };
-  setupPaintPath();
+  return setupStopJob("path");
 }
 
-/** setupAttachPath re-attaches to the job of the whole path after a
- *  reload. The page knows the id, so the run survives the browser. */
 async function setupAttachPath(doc) {
   await setupPathLoaded;
   const path = doc && doc.path;
   if (!path || !path.id) return;
-  setupState.pathJobID = path.id;
-  // Keep the moment the run started: re-attaching after a reload must
-  // not restart the clock.
-  const live = setupProgress.path || {};
-  setupProgress.path = {
-    phase: path.phase || "Working\u2026",
-    started: live.started || Date.now(),
-  };
+  await attachSetupJob({ id: "path", title: "Setup", job_id: path.id, job_state: path.state },
+    { onRefresh: () => loadSetupDocument() });
+  setupRefreshRun("path", true);
   setupPaintPath();
-  if (path.state !== "running") return;
-  if (!setupLogs.path) setupLogs.path = [];
-  followSetupJob({ id: "path" }, { id: path.id }, { onRefresh: () => { setupRefreshRun("path"); loadSetupDocument(); } });
 }
 
-/** setupRunRows draws the steps of the setup run with the time they took
- *  (spec §6.4). The title of a step is the human sentence; the id is
- *  for machines. */
-function setupRunRows() {
-  const run = setupState.run;
+function setupRunRows(run = setupState.run) {
   if (!run || !run.steps || !run.steps.length) return null;
   return h("div.step-run",
-    h("p.small.muted.step-run-head", "What the setup is doing"),
-    h("div.step-run-list", run.steps.map((s) => setupRunRow(s))));
+    h("p.small.muted", "Installation record · " + (run.started_at ? new Date(run.started_at).toLocaleString() : "time unavailable")),
+    h("div.step-run-list", run.steps.map((s) => setupRunRow(s, run.id))));
 }
-
-/** setupRunRow is one row of the run list. data-step hooks the tick that
- *  re-paints the elapsed time of the running step. */
-function setupRunRow(s) {
-  return h("div", { class: "step-run-row step-run-row-" + s.state, "data-step": s.id },
+function setupRunRow(s, runID) {
+  return h("div", { class: "step-run-row step-run-row-" + s.state, "data-run-step": s.id },
     h("span.step-run-row-id", s.title || s.id),
-    h("span.step-run-row-state", s.state),
-    h("span.step-run-row-duration", { "data-dur": "1" }, setupRunRowDuration(s)));
+    h("span.step-run-row-state", TIMELINE_STATE_WORD[s.state] || s.state),
+    h("span.step-run-row-duration", { "data-dur": "1" }, setupRunRowDuration(s)),
+    (s.commands || []).length ? h("details.advanced.step-run-commands", h("summary", "Commands"),
+      s.commands.map((c) => cmdBlock(c, "Copy the command"))) : null,
+    s.log_path ? h("a.small", { href: "/api/setup/runs/" + encodeURIComponent(runID) + "/log/" + encodeURIComponent(s.id), target: "_blank", rel: "noopener noreferrer" }, "Recorded output (JSON)") : null);
 }
 
-/** setupRunRowDuration is the elapsed-time text of a row. Frozen when the
- *  step has finished; live (ticked by setupTick) while the step runs.
- *  The record carries started_at so the time is right after a reload. */
 function setupRunRowDuration(s) {
-  if (s.duration_s > 0) return setupDuration(s.duration_s);
-  if (s.state !== "running") return "";
-  const t = setupRunStepStart(s);
-  if (!t) return "";
-  return setupDuration(Math.max(0, Math.round((Date.now() - t) / 1000)));
+  if (s.state === "running") {
+    const t = setupRunStepStart(s);
+    const active = Object.values(setupProgress).some((live) => live.running && live.runID === (setupState.run && setupState.run.id));
+    return active && t ? setupDuration((Date.now() - t) / 1000) : s.duration_s > 0 ? setupDuration(s.duration_s) + " recorded" : "Live timing unavailable";
+  }
+  return s.duration_s > 0 ? setupDuration(s.duration_s) : "";
 }
 
-/** setupRunStepStart is the moment a step of the run began. */
 function setupRunStepStart(s) {
-  if (s.started_at) {
-    const t = Date.parse(s.started_at);
-    if (!Number.isNaN(t)) return t;
-  }
-  const live = setupProgress[s.id];
-  if (live && live.started) return live.started;
-  return setupProgress.path && setupProgress.path.started || 0;
+  return Date.parse(s.started_at) || (setupProgress[s.id] && setupProgress[s.id].started) || 0;
 }
 
-/** setupPaintRunRows re-paints the elapsed time of any running row
- *  (called every second by setupTick). */
 function setupPaintRunRows() {
-  const run = setupState.run;
-  if (!run || !run.steps) return;
-  for (const s of run.steps) {
-    const row = document.querySelector('[data-step="' + s.id + '"] [data-dur]');
-    if (!row) continue;
-    const text = setupRunRowDuration(s);
-    if (row.textContent !== text) row.textContent = text;
+  for (const s of (setupState.run && setupState.run.steps) || []) {
+    const row = document.querySelector('[data-run-step="' + s.id + '"] [data-dur]');
+    if (row) row.textContent = setupRunRowDuration(s);
   }
 }
 
-/** setupPythonEnv draws the components table of the venv.verify step of
- *  the run: python, torch, triton, vllm (with the fork's git sha and
- *  branch), flash-attn, causal-conv1d, transformers, rocBLAS, RCCL and
- *  the host ROCm SDK (spec §6.3). The record is the one source: the
- *  page reads the same JSON the CLI prints and the MCP server returns.
- *  Lazy: when the run has no venv.verify step or its evidence has no
- *  components, the table is not shown.
- *
- *  The button checks the venv again: the server runs the check in the
- *  background and the page reads the new record of the run when it ends. */
+/** Verification is its own check; passing it cannot erase an installation failure. */
 function setupPythonEnv() {
-  const run = setupState.run;
-  if (!run || !run.steps) return null;
-  const step = run.steps.find((s) => s.id === "venv.verify");
-  if (!step || !step.evidence || !step.evidence.components) return null;
-  const comps = step.evidence.components;
-  if (!comps.length) return null;
-  const live = setupProgress.verify || {};
-  const running = !!live.running;
-  return h("div.python-env",
-    h("p.small.muted", "venv components (from the run record)"),
-    h("div.python-env-rows", comps.map((c) =>
-      h("div.python-env-row",
-        h("span.python-env-name", c.name || ""),
-        h("span.python-env-version", c.version || "absent"),
-        c.note ? h("span.python-env-note", "(" + c.note + ")") : null))),
-    h("button.small", { type: "button", disabled: running, onclick: setupVerifyAgain },
-      running ? "Checking\u2026" : "Verify again"),
-    live.phase ? h("p.step-progress-sentence", live.phase) : null);
+  const install = setupState.run;
+  const check = setupState.verifyRun;
+  const saved = setupProgress.verify;
+  const latest = check && (!install || Date.parse(check.started_at) >= Date.parse(install.started_at)) ? check : install;
+  const live = saved && (saved.running || !latest || saved.runID === latest.id || Date.parse(latest.started_at) <= (saved.started || 0)) ? saved : null;
+  const record = live ? [check, install].find((r) => r && r.id === live.runID) : latest;
+  const separate = !!live || record === check;
+  const step = record && (record.steps || []).find((s) => s.id === "venv.verify");
+  if (!step && !live) return null;
+  const running = live && live.running;
+  const state = live ? live.failed ? "failed" : running ? "running" : "done" : step.state;
+  const comps = step && step.evidence && step.evidence.components || [];
+  const busy = Object.values(setupProgress).some((s) => s.running);
+  return h("div.python-env", { "data-check-job": live && live.jobID || "" },
+    h("h3", "Python environment check ", statePill(state === "failed" ? "fail" : state, TIMELINE_STATE_WORD[state] || state)),
+    h("p.small.muted", separate ? "Separate check; this does not rebuild or start the server." : "Check recorded during installation; this does not test the server."),
+    record ? h("p.small.muted", "Recorded " + (record.started_at ? new Date(record.started_at).toLocaleString() : "at an unknown time")) : null,
+    install && install.state === "failed" ? h("p.recipe-warning", "The installation failed. A later environment check does not repair or rerun that failed build.") : null,
+    !live && step && step.state === "running" ? h("p.recipe-warning", "This is a saved in-progress check; live job status has not been confirmed.") : null,
+    h("p.step-progress-sentence", { "data-verify-phase": "1" }, live && live.phase || (state === "failed" ? "The environment check failed. Review its error below." : "")),
+    h("p.step-progress-detail", { "data-verify-time": "1" }, live ? setupLiveDetail(live) : ""),
+    h("p.small.muted.mono.step-log-line", { "data-verify-output": "1" }, live && live.logLine || ""),
+    h("button.small", { type: "button", disabled: busy, onclick: setupVerifyAgain }, running ? "Checking…" : "Check environment again"),
+    running ? h("button.small.setup-env-stop", { type: "button", onclick: () => setupStopJob("verify") }, "Stop check") : null,
+    h("details.advanced.setup-env-details", h("summary", "Components, error and check output"),
+      h("pre.step-error", live && live.error || record && record.error || ""),
+      comps.length ? h("div.python-env-rows", comps.map((c) => h("div.python-env-row",
+        h("span.python-env-name", c.name || ""), h("span.python-env-version", c.version || "not installed"),
+        c.note ? h("span.python-env-note", c.note) : null))) : h("p.small.muted", "No component evidence was recorded."),
+      step && record ? h("a.small", { href: "/api/setup/runs/" + encodeURIComponent(record.id) + "/log/" + encodeURIComponent(step.id), target: "_blank", rel: "noopener noreferrer" }, "Open recorded check output (JSON)") : null,
+      h("div.log-lines.step-log.setup-verify-log", { role: "log", "aria-live": "off" })));
 }
 
-/** setupVerifyAgain checks the venv again. The server runs the check of
- *  the venv in the background and records the run; the page reads that
- *  record when the job ends and paints the new components (spec §6.4).
- *  The button stays disabled while the check runs. */
 async function setupVerifyAgain() {
   await setupPathLoaded;
-  setupProgress.verify = { phase: "Checking the venv\u2026", started: Date.now(), running: true };
+  setupProgress.verify = { phase: "Checking the Python environment…", started: Date.now(), running: true };
+  setupLogs.verify = [];
   setupStartTicker();
   setupPaintPath();
-  let job = null;
-  try {
-    job = await api("/api/setup/verify", { method: "POST", body: { mode: setupState.mode } });
-  } catch (e) {
-    setupProgress.verify = { phase: "Failed: " + (e.message || e), failed: true, running: false };
+  let job;
+  try { job = await api("/api/setup/verify", { method: "POST", body: { mode: setupState.mode } }); }
+  catch (e) {
+    Object.assign(setupProgress.verify, { phase: "The check could not start.", error: String(e.message || e), failed: true, running: false, ended: Date.now() });
     setupPaintPath();
     return;
   }
-  followSetupJob({ id: "verify" }, job, {
-    onRefresh: () => {
-      const live = setupProgress.verify || {};
-      if (live.failed || live.phase === "Done.") live.running = false;
-      // The record of the run is the one source: the page reads it and
-      // paints the components of the new run.
-      setupRefreshRun("verify");
-      setupPaintPath();
-    },
-  });
+  followSetupJob({ id: "verify" }, job, { onRefresh: () => loadSetupDocument() });
 }
 
-/** setupPaintPath paints the run of the path: the step it is on, the phase
- *  and the Stop control. */
+/** Update stable nodes so elapsed ticks do not close disclosures or steal focus. */
 function setupPaintPath() {
   const box = setupState.pathBox;
   if (!box) return;
   const live = setupProgress.path;
-  if (!live || !live.phase) {
-    put(box);
-    return;
+  const run = setupState.run;
+  if (!live && !run && !setupState.verifyRun && !setupProgress.verify && !setupState.runError) { put(box); return; }
+  if (!box.querySelector(".setup-run")) put(box,
+    h("section.section.setup-run",
+      h("p.small.muted", { "data-path-label": "1" }),
+      h("h3", { "data-path-phase": "1", "aria-live": "polite" }),
+      h("p.step-progress-detail", { "data-path-time": "1" }),
+      h("p.small.muted.mono.step-log-line", { "data-path-output": "1" }),
+      h("p.small", { "data-path-help": "1" }),
+      h("div.setup-run-actions",
+        h("button", { type: "button", "data-path-stop": "1", onclick: setupStopPath }, "Stop setup"),
+        h("button", { type: "button", onclick: () => loadSetupDocument() }, "Refresh status"),
+        h("button", { type: "button", "data-path-retry": "1", onclick: setupStartPath }, "Retry setup")),
+      h("details.advanced.setup-run-details", h("summary", "Error, step history and output"),
+        h("pre.step-error", { "data-path-error": "1" }),
+        h("div.setup-run-history"),
+        h("p.small.muted", { "data-path-log-note": "1" }),
+        h("div.log-lines.step-log.setup-path-log", { role: "log", "aria-live": "off" }))),
+    h("p.recipe-warning.setup-history-warning"), h("div.setup-check-evidence"));
+  const panel = box.querySelector(".setup-run");
+  panel.hidden = !live && !run;
+  const running = !!(live && live.running);
+  const failed = live ? live.failed : run && ["failed", "blocked"].includes(run.state);
+  const linked = live && run && live.runID === run.id;
+  const shown = !live || linked ? run : null;
+  const steps = shown && shown.steps || [];
+  const step = steps.find((s) => s.state === "running" || s.state === "failed") || steps[steps.length - 1];
+  const label = running ? "Setup in progress" : live ? failed ? "Setup did not finish" : "Setup finished" : "Last recorded installation · " + (run && run.state || "unknown");
+  box.querySelector("[data-path-label]").textContent = label;
+  box.querySelector("[data-path-phase]").textContent = live && live.failed && step ? step.title + " did not finish" : live && live.phase || step && step.title || "No step details were recorded.";
+  box.querySelector("[data-path-time]").textContent = live ? setupLiveDetail(live) : run && run.duration_s != null ? "Recorded duration: " + setupDuration(run.duration_s) : "Duration unavailable";
+  const log = setupState.runLog;
+  const output = live && live.logLine || shown && log && log.run === shown.id && log.logLine;
+  box.querySelector("[data-path-output]").textContent = output ? "Latest available output: " + output : "No output is available yet.";
+  box.querySelector("[data-path-help]").textContent = live && live.unavailable
+    ? "Live status could not be read. Refresh status before starting another job."
+    : failed ? "Review the error and output, correct the cause, then re-check the host before retrying."
+    : running ? "You can reload; setup continues on the host. Elapsed time alone does not confirm progress."
+    : shown && shown.state === "running" ? "This saved record says in progress; live job status has not been confirmed. Refresh host status."
+    : "Recorded installation outcome only. Check the host status above to see whether a model is serving.";
+  box.querySelector("[data-path-error]").textContent = live && live.error || shown && shown.error || "";
+  const stop = box.querySelector("[data-path-stop]");
+  stop.hidden = !running;
+  stop.disabled = !live || !live.jobID || !!live.stopping;
+  box.querySelector("[data-path-retry]").hidden = !failed || running || !(setupState.doc && setupState.doc.primary && setupState.doc.primary.kind === "setup");
+  const history = box.querySelector(".setup-run-history");
+  const key = JSON.stringify([shown && shown.id, steps.map((s) => s.id + s.state), live && live.commands]);
+  if (history.dataset.key !== key) {
+    history.dataset.key = key;
+    put(history, setupRunRows(shown), (live && live.commands || []).map((c) => cmdBlock(c, "Copy the administrator command")));
   }
-  const running = !live.failed && live.phase !== "Done." && live.phase !== "Stopped.";
-  const commands = live.commands || [];
-  // The headline follows the run: the reader sees the box is being set
-  // up without waiting for the next read of the checklist.
-  if (running) {
-    setHead(setupState.head, "SETTING UP THIS BOX.", live.phase);
+  const recorded = shown && log && log.run === shown.id;
+  const lines = setupLogs.path || [];
+  const recordedOutput = recorded && (!lines.length || live && live.logTail);
+  setupPaintLog(box.querySelector(".setup-path-log"), recordedOutput ? log.lines || [] : lines);
+  box.querySelector("[data-path-log-note]").textContent = recordedOutput && log.truncated ? "Showing the last 400 recorded lines." : live && live.logTail && !recordedOutput ? "Showing the last saved job output." : "";
+  box.querySelector(".setup-history-warning").textContent = setupState.runError || "";
+  const checkBox = box.querySelector(".setup-check-evidence");
+  const verify = setupProgress.verify;
+  const check = setupState.verifyRun;
+  const busy = Object.values(setupProgress).some((s) => s.running);
+  const checkKey = JSON.stringify([run && [run.id, run.state], check && [check.id, check.state], verify && [verify.jobID, verify.runID, verify.running, verify.failed, verify.error], busy]);
+  if (checkBox.dataset.key !== checkKey) {
+    checkBox.dataset.key = checkKey;
+    put(checkBox, setupPythonEnv());
   }
-  put(box,
-    h("p.small.muted", running ? "bernie is setting up this box." : (live.failed ? "The setup stopped." : "The setup is done.")),
-    h("p.step-progress-sentence", live.phase),
-    live.detail ? h("p.small.muted", live.detail) : null,
-    // The last line of the step log: a build prints a heartbeat, so the
-    // box shows it is alive without the reader opening the log.
-    live.logLine ? h("p.small.muted.mono.step-log-line", live.logLine) : null,
-    setupRunRows(),
-    setupPythonEnv(),
-    commands.map((c) => cmdBlock(c, "Copy the command")),
-    running ? h("button.small", { type: "button", onclick: setupStopPath }, "Stop") : null,
-    commands.length ? h("button.small", { type: "button", onclick: () => loadSetupDocument() }, "Re-check") : null);
+  const card = checkBox.querySelector(".python-env");
+  const currentCheck = verify && card && card.dataset.checkJob === verify.jobID;
+  const phase = checkBox.querySelector("[data-verify-phase]");
+  const time = checkBox.querySelector("[data-verify-time]");
+  if (currentCheck && phase) phase.textContent = verify.phase || "";
+  if (currentCheck && time) time.textContent = setupLiveDetail(verify);
+  const preview = checkBox.querySelector("[data-verify-output]");
+  if (currentCheck && preview) preview.textContent = verify.logLine ? "Latest available output: " + verify.logLine : "";
+  const verifyStop = checkBox.querySelector(".setup-env-stop");
+  if (verifyStop) verifyStop.disabled = !!verify.stopping || !verify.jobID;
+  setupPaintLog(checkBox.querySelector(".setup-verify-log"), currentCheck ? setupLogs.verify || [] : []);
+  const status = (running ? "running" : failed ? "failed" : "finished") + (verify && verify.running ? ":checking" : "");
+  if (panel.dataset.status !== status) {
+    panel.dataset.status = status;
+    if (setupState.doc) paintSetupHead(setupState.doc);
+  }
 }

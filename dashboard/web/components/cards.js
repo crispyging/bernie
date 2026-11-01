@@ -4,7 +4,7 @@
 
 /** jsonLink opens the raw JSON of an endpoint in a new tab. */
 function jsonLink(path) {
-  return h("a.json-link", {
+  return h("a.json-link.advanced-only", {
     href: path,
     target: "_blank",
     rel: "noopener noreferrer",
@@ -74,11 +74,9 @@ function emptyState(what, next, command) {
     command ? cmdBlock(command, "Copy the command") : null);
 }
 
-/** sectionLabel is the label of a section: one shape on every tab. The text is
- *  uppercase in the DOM, so the words a screen reader reads are the words the
- *  reader sees. */
+/** sectionLabel preserves the author's wording without forced uppercase. */
 function sectionLabel(text, ...rest) {
-  return h("h2.section-label", { tabindex: "-1" }, String(text || "").toUpperCase(), ...rest);
+  return h("h2.section-label", { tabindex: "-1" }, String(text || ""), ...rest);
 }
 
 /** PILL_ICON is the mark of a state: the word carries the meaning, the mark

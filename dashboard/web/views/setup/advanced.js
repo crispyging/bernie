@@ -1,17 +1,11 @@
-// The Advanced panel of the Setup tab: the raw documents behind the page
-// and the commands that produce them.
-// Adapted from vllm-rdna-dash by CrispyGinger, used with permission.
+// Raw setup evidence. Adapted from vllm-rdna-dash by CrispyGinger, with permission.
 "use strict";
 
-/** setupAdvancedPanel is the disclosure at the end of the tab. */
 function setupAdvancedPanel() {
   const body = h("div.setup-advanced-body", loading());
-  const summary = h("summary", "Show details");
+  const summary = h("summary", "Raw data and terminal commands");
   const panel = h("details.advanced.setup-advanced", summary, body);
-  // The tab remembers the state of the disclosure: the tab repaints itself
-  // when a job reports, and the disclosure stays where the reader left it.
   panel.open = !!setupState.detailsOpen;
-  panel.dataset.local = setupState.detailsOpen ? "1" : "0";
   let loaded = false;
   panel.addEventListener("toggle", async () => {
     if (!panel.open || loaded) return;
@@ -21,8 +15,7 @@ function setupAdvancedPanel() {
   return panel;
 }
 
-/** loadSetupAdvanced reads every document the tab used and paints it with
- *  the command that produces the same answer. */
+/** These are snapshots, not a second source of live status. */
 async function loadSetupAdvanced(body) {
   const entries = [];
   const read = async (path) => {
@@ -35,11 +28,15 @@ async function loadSetupAdvanced(body) {
   await read("/api/onboarding");
   await read("/api/recipes");
   await read("/api/doctor");
+  await read("/api/setup/runs");
   if (setupState.recipeID) {
-    await read("/api/recipes/" + encodeURIComponent(setupState.recipeID) + "/plan");
+    const query = new URLSearchParams({ mode: setupState.mode });
+    if (setupState.name) query.set("name", setupState.name);
+    for (const set of setupState.sets) query.append("set", set);
+    await read("/api/recipes/" + encodeURIComponent(setupState.recipeID) + "/plan?" + query.toString());
   }
   put(body,
-    h("p.setup-advanced-note", "The documents behind this page. An agent gets the same ones from the API."),
+    h("p.setup-advanced-note", "Data snapshots captured when this disclosure opened. The API and terminal expose the same records."),
     setupDownloadLimit(),
     entries.map(setupAdvancedDocument),
     h("h3", "The same thing in a terminal"),
@@ -50,9 +47,7 @@ async function loadSetupAdvanced(body) {
     cmdBlock("bernie doctor", "Copy the command"));
 }
 
-/** setupDownloadLimit is the control for the speed limit of the model
- *  download (R21). The value is in force within a second for every
- *  running download. */
+/** The limit applies to active downloads only after the user saves it. */
 function setupDownloadLimit() {
   const field = h("input", { type: "text", id: "setup-download-limit", placeholder: "5MB" });
   const note = h("span.small.muted", "");
@@ -81,8 +76,7 @@ function setupDownloadLimit() {
   return box;
 }
 
-/** setupAdvancedDocument is one raw document with its endpoint and a copy
- *  button. */
+/** Raw JSON stays selectable and copyable. */
 function setupAdvancedDocument(entry) {
   const text = entry.error
     ? JSON.stringify({ error: entry.error }, null, 2)

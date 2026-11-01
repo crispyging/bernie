@@ -51,7 +51,7 @@
 .step-root p { margin: 6px 0 0; }
 .step-progress { margin-top: var(--space-2); }
 .step-progress:empty { margin-top: 0; }
-.step-progress-sentence { margin: 0 0 6px; font-size: 13px; color: var(--text-2); }
+.step-progress-sentence { margin: 0 0 6px; font-size: var(--body); color: var(--text-2); }
 .step-progress-detail { color: var(--muted); font-size: var(--small); }
 
 /* The run rows under the path box: one line per step. */
@@ -59,7 +59,8 @@
   display: flex;
   gap: var(--space-2);
   align-items: center;
-  padding: 4px 8px;
+  flex-wrap: wrap;
+  padding: 8px 10px;
   border-radius: 6px;
   font-size: var(--small);
   color: var(--text-2);
@@ -87,6 +88,11 @@
 .step-run-list { display: flex; flex-direction: column; gap: 2px; }
 .step-log-box { margin-top: var(--space-2); }
 .step-log-line { margin: 2px 0 0; overflow-wrap: anywhere; }
+.setup-run { min-width: 0; }
+.setup-run-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.step-run-commands { flex-basis: 100%; min-width: 0; margin: 0; }
+.step-error { max-height: 240px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
+.step-error:empty, .setup-history-warning:empty { display: none; }
 .step-log { max-height: 200px; overflow: auto; }
 
 .step-bar {
@@ -105,7 +111,7 @@
   transition: width var(--motion-progress) ease;
 }
 
-.progress-sentence { margin: 0 0 6px; font-size: 13px; color: var(--text-2); }
+.progress-sentence { margin: 0 0 6px; font-size: var(--body); color: var(--text-2); }
 
 .log-lines {
   max-height: 160px;
@@ -226,9 +232,9 @@ details.advanced {
 
 details.advanced > summary {
   cursor: pointer;
-  font: 800 var(--section-label)/1.3 var(--font-display);
-  letter-spacing: .14em;
-  text-transform: uppercase;
+  font: 600 var(--small)/1.5 var(--font-body);
+  letter-spacing: normal;
+  text-transform: none;
   color: var(--muted);
 }
 
