@@ -1,11 +1,11 @@
 // The Setup tab answers one question: what do I do to make this box serve?
-// Adapted from vllm-rdna-dash by CrispyGinger, used with permission.
+// Adapted from vllm-rdna-dash by CrispyGinger (Apache-2.0).
 "use strict";
 
 // The Setup tab answers one question: what do I do to make this box serve?
 // It reads the onboarding checklist, the doctor report and the recipes, and
 // it never changes the host on its own.
-// Adapted from vllm-rdna-dash by CrispyGinger, used with permission.
+// Adapted from vllm-rdna-dash by CrispyGinger (Apache-2.0).
 "use strict";
 
 // SETUP_EXTRA_STEPS are the steps that come after the path of the host.

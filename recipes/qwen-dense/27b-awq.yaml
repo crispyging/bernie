@@ -59,6 +59,10 @@ model:
 requires:
   gpus: 4
   vram_gib: 28
+  download_gb: 21                 # 19.57 GiB in the HF cache
+  # Measured 2026-10-30 on one V620: the 5e9-byte KV reserve held 63,811
+  # tokens with the FP16 KV cache and 1024-token blocks (5e9 / 63,811).
+  kv_bytes_per_token: 78356
 
 env:
   VLLM_RDNA2_W4A8_SDOT4: "1"

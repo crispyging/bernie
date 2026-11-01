@@ -4,7 +4,7 @@
    a token.
 
    The palette and the type follow the reference web UI (vllm-rdna-dash by
-   CrispyGinger, used with permission). Every pair below was measured with the
+   CrispyGinger, Apache-2.0). Every pair below was measured with the
    WCAG 2.1 relative luminance formula: 4.5:1 for text, 3:1 for the edge of a
    control and for the large text. The pairs that failed were moved by the
    smallest step that passes; the original and the adjusted value are written

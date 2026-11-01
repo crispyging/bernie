@@ -13,10 +13,6 @@ Each item has a spec section and one test that proves it.
 
 | # | Item | Spec | Test |
 |---|---|---|---|
-| 1 | **Fit in recipe data.** A recipe lists `download_gb`, `vram_gib`, `ram_gib`, `kv_bytes_per_token`. `recipe list` shows `fits`, `tight: <reason>` or `no: <reason>`. | §7.2, §7.8 | `recipe list --json` on a fixture host: each recipe has `fit.verdict`; `fit.reasons` is non-empty unless `fits`. |
-| 2 | **Plan shrinks to fit.** `recipe plan` lowers `max-model-len` (32K, 16K, 8K) until the KV budget fits free VRAM. Each change is in `plan.adjustments[]` with a reason. A `--set` value is never changed. | §7 | `recipe plan --json` on a 16 GB fixture shows the adjustment; `--set args.max-model-len=8192` stays 8192. |
-| 4 | **Ready means answers.** A run is `ready` only after `/health` and a one-token completion succeed. | §3.1, §8.3 | A run with the model unloaded stays `starting` and says why. |
-| 5 | **Log doctor on failure.** When a run exits during startup, `serve` and `up` print the matched rule: id, cause, fix. | §5.3 | A fixture log with a known error prints that rule. |
 | 6 | **Next command in every state.** `status --json` has `next` for: no GPU, no recipe fits, recipe fits, run starting, run ready. | §3.1 | Fixture set covers the five states. |
 
 ## Then: honest results and connected clients
@@ -30,6 +26,30 @@ Each item has a spec section and one test that proves it.
 
 ## Shipped
 
+- **Log doctor on failure.** When a run exits during startup, `serve` and
+  `up` scan its log and print every matched rule: id, cause, fix, doc link
+  and the line. `--json` carries them in `log_findings`. Spec
+  [§5.3](spec.md#53-log-doctor).
+- **Ready means answers.** A run is `running` only after `/health`
+  answers and the server answered a one-token completion. The state name
+  stays `running`, since `ps --json` is an API. A run that is still
+  `starting` says why in `waiting`, and `up` and `serve --wait` fail with
+  that reason at their limit. Spec [§8.3](spec.md#83-run-record).
+- **Plan shrinks to fit.** `recipe plan` lowers `max-model-len` to 32K,
+  16K or 8K when one request does not fit the KV budget, and records the
+  change in `plan.adjustments[]` with its reason. `serve`, `compose` and
+  `up` print it. An override of `max-model-len` is never changed; the
+  plan warns when it does not fit. Spec
+  [§7.10](spec.md#710-plan-adjustments).
+- **Fit in recipe data.** A recipe may list `requires.download_gb` and a
+  measured `requires.kv_bytes_per_token` next to `vram_gib` and `ram_gib`.
+  `recipe list` gives every recipe `fits`, `tight: <reason>` or
+  `no: <reason>` in `fit.status` (the field `--json` already had), and
+  `fit.reasons` is empty only when the recipe fits. A recipe is tight when
+  the download does not fit the free disk of the model cache, or when one
+  request of `max-model-len` needs more KV cache than the budget. `up`
+  picks a recipe that fits before one that is tight. Spec
+  [§7.8](spec.md#78-fit).
 - **Bench suites.** A suite is data: `bench/suites/*.yaml` holds the cells,
   the repetitions and the thresholds of a run. The loader is strict, and
   the digest of the suite pins the cells of a result. `bernie bench
@@ -145,20 +165,17 @@ Each item has a spec section and one test that proves it.
 ## The next dashboard
 
 The design of the new dashboard is written down: the shell, the tokens, the
-four tabs (Setup, Dashboard, Benchmark, Logs), the copy of every state and
-the wireframes are in [design-dashboard.md](design-dashboard.md) and in
-[design/](design/). It is a design, not a plan: the first commit that uses
-it is the shell, and every commit names the files it touches.
+eight tabs, the copy of every state and the wireframes are in
+[design-dashboard.md](design-dashboard.md) and in [design/](design/).
 
-| # | Item | Spec | Test |
-|---|---|---|---|
-| 10 | **The dashboard v3 shell.** Four tabs in a rail, the measured tokens, one primary action per tab, a toast, a tooltip and an Advanced panel on every tab. | [design-dashboard.md](design-dashboard.md) | the four tabs open from their hash routes, the old routes still work, and the page does not scroll sideways at 390 px |
+The shell has shipped: the eight tabs of design §2.2 open from their hash
+routes, the old routes land on their new tab, every tab has one primary
+action, and no tab scrolls sideways at 390 px (checked 2026-10-31 in the
+demo, light and dark, 1280 and 390 px).
 
 The design of the dashboard and parts of its markup and CSS come from
 [CrispyGinger's vllm-rdna-dash](https://github.com/crispyging/vllm-rdna-dash),
-used with the author's permission. Pending: the author adds a licence file to
-that repository, so the use is recorded with a licence and not with a
-permission.
+under its Apache-2.0 licence. Each adapted file says so in its header.
 
 ## Not planned
 

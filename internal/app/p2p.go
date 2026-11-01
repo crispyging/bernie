@@ -68,7 +68,7 @@ func P2PChecklist(ctx context.Context, o P2PChecklistOptions) (P2PChecklistRepor
 // best fitting recipe; no recipe fits gives an empty environment.
 func recipeEnv(set recipe.Set, id string, gpus []gpu.GPU) (topo.RecipeEnv, error) {
 	if id == "" {
-		id = recipe.Best(recipe.List(set, gpus, hostRAM(), false))
+		id = recipe.Best(recipe.List(set, fitHost(gpus), false))
 		if id == "" {
 			return topo.RecipeEnv{}, nil
 		}

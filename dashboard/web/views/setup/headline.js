@@ -1,5 +1,5 @@
 // The headline of the Setup tab: the state of the host and the one next action.
-// Adapted from vllm-rdna-dash by CrispyGinger, used with permission.
+// Adapted from vllm-rdna-dash by CrispyGinger (Apache-2.0).
 "use strict";
 
 /** setupHeadline says what the machine is in one sentence, with the lede

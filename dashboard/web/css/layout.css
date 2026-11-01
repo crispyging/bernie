@@ -1,5 +1,5 @@
 /* bernie dashboard: the layout.
-   Adapted from vllm-rdna-dash by CrispyGinger, used with permission.
+   Adapted from vllm-rdna-dash by CrispyGinger (Apache-2.0).
    The shell is a rail on the left and a content column on the right. The rail
    holds the brand, the four tabs, the old tabs under "Classic" and the footer
    with the run status, the theme button and the Advanced button.

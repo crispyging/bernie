@@ -463,14 +463,14 @@ flowchart LR
 ### 3.3 Life of a run
 
 The state of a run is not stored. `runner.List` derives it from the process
-(or container) and `/health`. Only `run.json` is stored, when `Start`
-succeeds. A plan has no record until it starts.
+(or container), `/health` and one completion. Only `run.json` and the
+`answered` mark of the first completion are stored. A plan has no record until it starts.
 
 ```mermaid
 stateDiagram-v2
   [*] --> planned: Prepare (recipe plan)
   planned --> starting: Start writes run.json
-  starting --> running: /health answers 200
+  starting --> running: /health answers 200 and one completion answers
   running --> starting: process alive, /health silent
   starting --> exited: process or container gone
   running --> exited: bernie stop, or a crash

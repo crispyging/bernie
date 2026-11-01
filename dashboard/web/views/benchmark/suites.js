@@ -176,7 +176,7 @@ function benchHistory(list, verdicts, onPick, onDelete) {
 function benchAB(onRun) {
   const base = h("input", { type: "text", id: "bench-ab-base", placeholder: "flashnext" });
   const cand = h("input", { type: "text", id: "bench-ab-cand", placeholder: "http://127.0.0.1:8001" });
-  const btn = h("button.primary", { type: "button" }, "Run the A/B");
+  const btn = h("button", { type: "button" }, "Run the A/B");
   const out = h("div.bench-ab-out");
   const form = h("form.bench-ab",
     h("label", { for: "bench-ab-base" }, "Base"), base,

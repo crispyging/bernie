@@ -1,6 +1,6 @@
 // The actions of the steps of the checklist: start a step, follow the job
 // it starts and show the progress under the step.
-// Adapted from vllm-rdna-dash by CrispyGinger, used with permission.
+// Adapted from vllm-rdna-dash by CrispyGinger (Apache-2.0).
 "use strict";
 
 // The maps of the live step state live in setup.js so the first paint
@@ -82,12 +82,9 @@ function followSetupJob(step, job, options) {
       paintSetupProgress(id);
       loadSetupJobProgress(job.id, id);
       // The setup steps have a record of their own: the page reads it
-      // instead of a second source (spec §6.4). Per-line refresh of the
-      // checklist (onRefresh) is for done/failed only — calling it here
-      // re-attaches the stream, which replays every line from the first,
-      // which calls onRefresh again, and the page loops until the browser
-      // runs out of per-host sockets (ERR_INSUFFICIENT_RESOURCES, white
-      // screen). The path/python-env rows have their own live refresh.
+      // instead of a second source (spec §6.4). onRefresh runs on
+      // done/failed only: here it re-attaches the stream, which replays
+      // every line and loops until the browser runs out of sockets.
       if (id === "python-env" || id === "path") setupRefreshRun(id);
     },
     done: (ev) => finish("done", ev.data),
@@ -221,10 +218,8 @@ function setupDuration(seconds) {
   return Math.round(s / 60) + " min";
 }
 
-// setupTicker is the 1 Hz tick that refreshes the elapsed time of any
-// running step. Setup events carry their own paint, but the build of a
-// big wheel (causal-conv1d, vllm) can take minutes between events; without
-// the tick the page would freeze on "working… 1 s" for that whole window.
+// setupTicker is the 1 Hz tick that refreshes the elapsed time of a
+// running step: a wheel build can go minutes without an event.
 let setupTicker = null;
 function setupStartTicker() {
   if (setupTicker) return;

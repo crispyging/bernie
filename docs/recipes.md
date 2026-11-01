@@ -66,6 +66,8 @@ requires:
   vram_gib: 28                  # per GPU
   ram_gib: 48                   # host RAM
   engine: vllm-rdna             # vllm | vllm-rdna (needs the fork's kernels)
+  download_gb: 21               # optional. The model download in GB.
+  kv_bytes_per_token: 78356     # optional. Measured KV cache of one token over all ranks.
 
 inputs:                         # values the operator gives with --set NAME=VALUE
   PLE_QUANT_DIR:
@@ -305,7 +307,15 @@ arch it needs.
 | `full` | `qwen-dense/` | 2 | host, container | Qwen3.8-27B AWQ-INT4, full HIP path, TP2. Validated. |
 | `dsv4-flash` | `deepseek/` | 4 | host, container | DeepSeek-V4-Flash K128 (fp8 + MXFP4 experts), TP4. Needs input `MODEL`. Experimental. |
 
-`bernie recipe list` shows the fit of each recipe on this host.
+`bernie recipe list` shows the fit of each recipe on this host: `fits`,
+`tight: <reason>`, `no: <reason>` or `unknown`. A `tight` recipe runs after
+one change: free disk for the download, or a shorter `max-model-len`.
+
+To measure `kv_bytes_per_token`, start the recipe once with a fixed
+`kv-cache-memory-bytes`. vLLM logs the tokens the KV cache holds. Divide the
+reserve times the ranks of a replica by that number. Write down the date,
+the host and the numbers in a comment next to the value. Leave the field
+out when you have not measured it.
 
 ## 12. Differences from the fork launcher
 

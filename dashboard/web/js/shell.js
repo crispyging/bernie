@@ -1,5 +1,5 @@
 // bernie dashboard: the page-wide behaviour.
-// Adapted from vllm-rdna-dash by CrispyGinger, used with permission.
+// Adapted from vllm-rdna-dash by CrispyGinger (Apache-2.0).
 // The toast, the copy button, the tooltip, the theme, the Advanced panels and
 // the run status pill. The views only call these.
 "use strict";
@@ -246,7 +246,7 @@ function setRunPill(runs) {
   let word = "idle", tone = "skip", sentence = "No run is serving on this host.";
   if (starting.length) {
     word = "starting"; tone = "info";
-    sentence = phaseSentence(starting[0], "The server is loading the model.");
+    sentence = phaseSentence(starting[0], starting[0].waiting || "The server is loading the model.");
   } else if (live.length) {
     const answering = live.some((r) => r.answering !== false);
     if (answering) {

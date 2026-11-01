@@ -1,5 +1,5 @@
 /* bernie dashboard: the components.
-   Adapted from vllm-rdna-dash by CrispyGinger, used with permission.
+   Adapted from vllm-rdna-dash by CrispyGinger (Apache-2.0).
    The buttons, the pills, the cards, the command blocks, the tables, the
    meters, the tiles and the states every card can be in. A colour comes from
    a token: nothing here writes a hex. */

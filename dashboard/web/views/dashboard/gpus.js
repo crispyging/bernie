@@ -2,7 +2,7 @@
 // ---------- Dashboard tiles and GPU cards ----------
 // One reusable tile and one card per AMD GPU on the host.
 //
-// Adapted from vllm-rdna-dash by CrispyGinger, used with permission.
+// Adapted from vllm-rdna-dash by CrispyGinger (Apache-2.0).
 
 // dashTile is one KPI tile: the name of the number, the number with its
 // unit, one line of context and the last minute of it. A number that was not
@@ -22,7 +22,7 @@ function dashTile(spec) {
   el.append(label, value, sub, sparkBox);
   el.update = (next) => {
     amount.textContent = next.value;
-    unit.textContent = next.unit || "";
+    if (next.unit != null) unit.textContent = next.unit;
     unit.style.opacity = next.value === "–" ? ".55" : "1";
     sub.textContent = next.sub || "";
     chart.update(next.series || [], next.max);
@@ -49,7 +49,7 @@ function dashCard(hip) {
   const mem = meter(null, null, { label: "Memory", unit: "GiB", format: (v) => num(v / (1024 * 1024 * 1024)) });
   const pow = meter(null, null, { label: "Power", unit: "W", sep: " of ", format: (v) => num(Math.round(v)) });
   const temps = h("div.stat-row", { class: "dash-stat-row" });
-  const clocks = h("div.stat-row", { class: "dash-stat-row-center" });
+  const clocks = h("div.stat-row", { class: "dash-stat-row dash-stat-row-center" });
   const hot = h("div", { class: "dash-stat-hot" });
   const age = h("div", { class: "small muted" });
   stats.append(mem, pow, temps, hot, age, clocks);

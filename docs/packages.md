@@ -207,16 +207,21 @@ type Set struct { Recipes map[string]*Recipe; Errors []LoadError }
 func Load(extraDirs ...string) Set                 // layers: embedded, config, $BERNIE_RECIPES, extra
 func (s Set) Resolve(id string) (*Recipe, error)   // extends merged
 func Validate(r *Recipe) []string
-type Fit struct { Status string; Reasons, Modes []string }   // fits|no|unknown
-func CheckFit(r *Recipe, gpus []gpu.GPU, ramBytes uint64) Fit
-func List(s Set, gpus []gpu.GPU, ramBytes uint64, all bool) Listing
-func Best(l Listing) string                        // fit, then priority, then id
+type Fit struct { Status string; Reasons, Modes []string }   // fits|tight|no|unknown
+func (f Fit) Usable() bool                         // fits or tight
+type Host struct { GPUs []gpu.GPU; RAMBytes, DiskFreeBytes uint64; Cached func(model string) bool }
+func CheckFit(r *Recipe, h Host) Fit
+type KV struct { MaxModelLen int; BytesPerToken, NeedBytes, BudgetBytes float64; Source string }
+func CheckKV(r *Recipe, minVRAM uint64) *KV        // nil: no KV data
+func List(s Set, h Host, all bool) Listing
+func Best(l Listing) string                        // fits, then tight, then priority, then id
 func ValidatedArchs(s Set) []string
 type Plan struct { Recipe, Name, Mode, Entrypoint, Model, ServedName, Host string; Port int
-    Env map[string]string; Args []string; Settings []Setting; GPUs []int; HIPDevices, GPUSelectReason string
+    Env map[string]string; Args []string; Settings []Setting; Adjustments []Adjustment; GPUs []int; HIPDevices, GPUSelectReason string
     Image, ShmSize, TunableOpProfile, TunableOpRows string; PathInputs []string
     Mounts []Mount; Warnings []string; Exec *Exec }
 type Setting struct { Setting, Value, Why string }
+type Adjustment struct { Setting, From, To, Reason string }   // Plan.Adjustments
 type PlanOptions struct { Mode, Name string; Sets []string; GPUs []gpu.GPU; Topo *topo.Topology;
     TunedMoE func(gfx string) (string, error) }
 func BuildPlan(r *Recipe, o PlanOptions) (*Plan, error)
@@ -251,7 +256,7 @@ type PrepareOptions struct { Recipe, Mode, Name, Venv, Engine string; Sets []str
 func Prepare(ctx context.Context, o PrepareOptions) (*recipe.Plan, error) // config, recipe, GPUs, plan, host env, TunableOp, exec
 type Record struct { Name, Recipe, Mode string; PID int; Container, Engine, Host string;
     Port int; StartedAt time.Time; Log, Image, ImageDigest string; Plan *recipe.Plan }
-type Status struct { Record; State string }        // running|starting|exited
+type Status struct { Record; State, Waiting string }   // running|starting|exited; Waiting: why starting
 func Start(ctx context.Context, p *recipe.Plan, o StartOptions) (*Record, error)
 func List(ctx context.Context) ([]Status, error)
 func Stop(ctx context.Context, name string) error

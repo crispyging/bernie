@@ -125,9 +125,12 @@ func Gather(ctx context.Context, o Options) (*Facts, error) {
 		return nil, gpuErr
 	}
 	set := recipe.Load()
-	f.Recipes = recipe.List(set, f.GPUs, f.Host.RAMBytes, true)
+	f.Recipes = recipe.List(set, recipe.Host{
+		GPUs: f.GPUs, RAMBytes: f.Host.RAMBytes, DiskFreeBytes: host.FreeBytes(f.HFHome),
+		Cached: func(model string) bool { return setup.ModelCached(f.HFHome, model) },
+	}, true)
 	for _, e := range f.Recipes.Recipes {
-		if e.Fit.Status == recipe.FitYes {
+		if e.Fit.Usable() {
 			f.Fits = append(f.Fits, e.ID)
 		}
 	}
@@ -164,7 +167,7 @@ func Gather(ctx context.Context, o Options) (*Facts, error) {
 func pick(l recipe.Listing, sets []string) string {
 	var ready recipe.Listing
 	for _, e := range l.Recipes {
-		if e.Fit.Status != recipe.FitYes {
+		if !e.Fit.Usable() {
 			continue
 		}
 		if missingInput(e, sets) == "" {

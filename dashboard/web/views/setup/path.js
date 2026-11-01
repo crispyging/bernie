@@ -95,9 +95,7 @@ function setupRunRow(s) {
 function setupRunRowDuration(s) {
   if (s.duration_s > 0) return setupDuration(s.duration_s);
   if (s.state !== "running") return "";
-  // The first paint uses setupProgress.started; later paints just update
-  // the text node. Without a client-side start time, fall back to the
-  // start of the path so the row still ticks.
+  // No start time of the step: fall back to the start of the path.
   const started = (setupProgress[s.id] && setupProgress[s.id].started) ||
                   (setupProgress.path && setupProgress.path.started);
   if (!started) return "";

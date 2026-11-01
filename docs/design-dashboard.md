@@ -21,10 +21,10 @@ the arrangement.
 
 ## 1. Principles
 
-1. **Ours, with the author's permission.** The reference (vllm-rdna-dash by
-   CrispyGinger) is the source of the palette, the type and the rail. The
-   author has given permission to use its design and parts of its markup and
-   CSS; every file that carries them says so in its header, and the
+1. **Ours, on the reference's licence.** The reference (vllm-rdna-dash by
+   CrispyGinger) is the source of the palette, the type and the rail. It is
+   licensed under Apache-2.0, so bernie may use its design, markup and CSS;
+   every file that carries them says so in its header, and the
    third-party list records the use. The words, the numbers, the API and the
    information design are ours: a state headline, one primary action, a step
    timeline, facts with reasons, KPI tiles and copy buttons are a pattern, not
@@ -123,14 +123,15 @@ The pill in the rail footer answers "is something serving?".
 
 | State | Icon | Word | Colour |
 |---|---|---|---|
-| a run answers `/health` | ● | `serving` | `--ok` |
+| a run is `running`: it answers `/health` and a completion | ● | `serving` | `--ok` |
 | a run is loading the model | ◐ | `starting` | `--info` |
 | a run exists but does not answer | ! | `not answering` | `--warn` |
 | no run | – | `idle` | `--skip` |
 | the run died | ✕ | `stopped` | `--fail` |
 
 The pill carries the phase sentence as its `title` and its `aria-label`, for
-example `starting — Loading the model weights, 2 of 5 shards`. The full
+example `starting — Loading the model weights, 2 of 5 shards`. A starting run
+without a phase sentence carries its `waiting` reason instead (spec §8.3). The full
 sentence is always written out in the state headline of the tab.
 
 ### 2.4 Theme and Advanced
@@ -254,12 +255,11 @@ file of its role and tells the other workers.
 
 ## 5. Reference parity table
 
-The reference is a dashboard of another project. Its repository carries no
-licence, so we write our own code, our own CSS and our own copy, and we
-reproduce its layout, its chart types and its interaction patterns. This
-table is the swap list: if the author grants a licence, a worker can take
-the reference's markup and CSS for one component at a time, without
-redesigning anything.
+The reference is [vllm-rdna-dash](https://github.com/crispyging/vllm-rdna-dash).
+It is licensed under Apache-2.0, so bernie may take its markup, CSS and copy.
+An adapted file names the source and the licence in its header. This table
+is the swap list: it says, component by component, how close bernie is to
+the reference.
 
 | Component | Reference behaviour and measurement | Our implementation | Status |
 |---|---|---|---|

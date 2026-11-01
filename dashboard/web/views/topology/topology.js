@@ -7,7 +7,7 @@
 // readiness checklist of `bernie topo --check`). The view opens no fetch of
 // its own: it asks data.js.
 //
-// Adapted from vllm-rdna-dash by CrispyGinger, used with permission.
+// Adapted from vllm-rdna-dash by CrispyGinger (Apache-2.0).
 
 // topo is the state of the tab.
 const topo = {

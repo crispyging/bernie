@@ -5,7 +5,7 @@ Part of the design of the dashboard. The main file is
 
 The tokens live in `dashboard/web/css/tokens.css`. The names are ours; the
 values are the ones of the reference web UI (vllm-rdna-dash by CrispyGinger,
-used with permission), moved where a pair failed AA.
+Apache-2.0), moved where a pair failed AA.
 
 Every pair below was measured with the WCAG 2.1 relative luminance formula;
 the numbers are the ratios, not a target. Text needs 4.5:1, the edge of a

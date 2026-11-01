@@ -35,6 +35,7 @@ model:
 requires:
   gpus: 2
   vram_gib: 28
+  download_gb: 21                 # 19.57 GiB in the HF cache
 
 env:
   VLLM_USE_V2_MODEL_RUNNER: "1"

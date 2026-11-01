@@ -11,7 +11,7 @@ own now: the route is `#topology`, the old route `#dashboard/topology` is
 gone, and the files of the tab live in `dashboard/web/views/topology/` with
 their own sheet `dashboard/web/views/topology/topology.css`.
 
-Adapted from vllm-rdna-dash by CrispyGinger, used with permission.
+Adapted from vllm-rdna-dash by CrispyGinger (Apache-2.0).
 
 ## The order of the page
 

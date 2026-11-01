@@ -4,7 +4,7 @@
 //
 // The measured geometry of the drawings (the 120 x 34 sparkline, the 84 px
 // ring, the axis of the area chart) follows the reference UI.
-// Adapted from vllm-rdna-dash by CrispyGinger, used with permission.
+// Adapted from vllm-rdna-dash by CrispyGinger (Apache-2.0).
 //
 // Accessibility: every chart says its numbers in words (the aria-label, the
 // text beside it and the table under it), the two charts with a readout can
@@ -588,7 +588,7 @@ function ring(pct, label, opts) {
     }
     const p = Math.max(0, Math.min(100, v));
     fill.style.width = p.toFixed(1) + "%";
-    num.textContent = String(Math.round(p));
+    num.textContent = Math.round(p) + " %";
     track.setAttribute("aria-label", "the load of " + (label || "the card") + ": " + Math.round(p) + " %");
   };
   paint(pct);

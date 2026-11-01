@@ -26,7 +26,7 @@ type Config struct {
 	// confirmation prompt and run. The doctor still runs and any
 	// step that needs root still blocks the flow with its commands.
 	// Empty / false preserves the default (prompt).
-	AutoYes bool   `json:"auto_yes" yaml:"auto_yes,omitempty"`
+	AutoYes bool `json:"auto_yes" yaml:"auto_yes,omitempty"`
 	// DeviceAccess is how a container gets the GPU: classic | cdi |
 	// auto ("" = auto, spec §8.2).
 	DeviceAccess string `json:"device_access" yaml:"device_access,omitempty"`

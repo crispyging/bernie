@@ -1,5 +1,5 @@
 // Shared command block and copy button.
-// Adapted from vllm-rdna-dash by CrispyGinger, used with permission.
+// Adapted from vllm-rdna-dash by CrispyGinger (Apache-2.0).
 // Every command of the page is text: it is never markup.
 "use strict";
 

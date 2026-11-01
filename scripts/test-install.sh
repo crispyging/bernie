@@ -248,7 +248,7 @@ echo "test 7: --no-lan forces loopback only"
 t=$(setup)
 build_release "$t/release"
 read -r server_pid server_port < <(start_server "$t/release")
-run_install "$t" "http://127.0.0.1:$server_port" "$t/bin" "--dry-run --no-lan"
+run_install "$t" "http://127.0.0.1:$server_port" "$t/bin" "--dry-run --start --no-lan"
 rc=$(cat "$t/rc"); out=$(cat "$t/out")
 stop_server "$server_pid"
 assert_equals "dry-run --no-lan exit code" "$rc" "0"
@@ -274,7 +274,7 @@ echo $? >"$t/rc"
 set -e
 rc=$(cat "$t/rc"); out=$(cat "$t/out")
 assert_equals "--listen missing value exit code" "$rc" "2"
-assert_contains "--listen missing value message" "$out" "unknown flag: --listen"
+assert_contains "--listen missing value message" "$out" "--listen needs a value"
 teardown "$t"
 
 echo "test 10: dry-run --container prints the container plan"
@@ -302,7 +302,7 @@ echo $? >"$t/rc"
 set -e
 rc=$(cat "$t/rc"); out=$(cat "$t/out")
 assert_equals "--container-dir missing value exit code" "$rc" "2"
-assert_contains "--container-dir missing value message" "$out" "unknown flag: --container-dir"
+assert_contains "--container-dir missing value message" "$out" "--container-dir needs a value"
 teardown "$t"
 
 # --- the source path: no release, and Go to fetch ---------------------------

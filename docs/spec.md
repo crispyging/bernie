@@ -168,8 +168,10 @@ other file, script or compose file is required.
      mode). With `--json` no dashboard is started. The dashboard is reachable
      while the server loads the model: the
      Logs tab shows the run as `starting`, its phase sentence and its log.
-  8. It waits until `/health` answers (`--wait`, default 30 minutes) and
-     prints the progress.
+  8. It waits until the run is `running` ([§8.3](#83-run-record)): `/health`
+     answers and the server answered a one-token completion (`--wait`,
+     default 30 minutes). It prints the progress. A run that is still
+     `starting` at the limit fails with the `waiting` reason.
 
   A dashboard that cannot bind its address (the port is in use) is reported
   on stderr; `up` keeps waiting for the server. Ctrl-C stops the dashboard;
@@ -286,8 +288,8 @@ A `no*` command writes only its generated files under the state directory.
 `cdi` or `auto`), `--profile` (force a TunableOp
 profile), `--no-tunableop` and `--tuning`. `serve` adds `--foreground`,
 `--no-pull`, `--wait D`, `--dash[=ADDR]` and `--dry-run` (same output as
-`recipe plan`). `serve --wait D` waits up to `D` until `/health` answers,
-like `up`; a run that exits first is reported like in `up`. While it waits,
+`recipe plan`). `serve --wait D` waits up to `D` until the run is
+`running`, like `up`; a run that exits first is reported like in `up`. While it waits,
 `serve` prints the phase sentence of the run ([§5.4](#54-log-phase)).
 Without `--wait`, `serve` returns once the run is started. `serve --dash`
 starts the dashboard next to the run (default address `127.0.0.1:7860`,
@@ -1033,6 +1035,8 @@ requires:
   vram_gib: 28                  # per GPU
   ram_gib: 64                   # host RAM
   engine: vllm-rdna             # vllm | vllm-rdna (needs the fork's kernels)
+  download_gb: 21               # optional; the model download in GB (10^9 bytes)
+  kv_bytes_per_token: 78356     # optional; KV cache of one token over all ranks, measured
 
 inputs:                         # values the operator gives with --set NAME=VALUE
   PLE_QUANT_DIR:
@@ -1129,8 +1133,35 @@ plan, `status`, `hw` and `doctor` all see the visible set only.
 
 ### 7.8 Fit
 
-`recipe list` gives each recipe a fit: `fits`, `no` (with reasons), or
-`unknown` (no GPU data). Reasons: arch, GPU count, VRAM, RAM.
+`recipe list` gives each recipe a fit in `fit.status`, with the reasons
+in `fit.reasons`:
+
+- `fits`: the recipe runs on this host as written. `reasons` is empty.
+- `tight`: the recipe runs on this host after one change. Each reason
+  names the change.
+- `no`: the host cannot run the recipe. Reasons: arch, GPU count, VRAM,
+  RAM.
+- `unknown`: no GPU data.
+
+A recipe is `tight` when it passes the `no` checks and one of these holds:
+
+- `disk`: the model download (`requires.download_gb`) is larger than the
+  free space of the Hugging Face cache. A model the cache holds, or a local
+  path, needs no download.
+- `kv`: one request of `args.max-model-len` tokens needs more KV cache
+  (`requires.kv_bytes_per_token` times the length) than the budget of a
+  replica. The budget is `args.kv-cache-memory-bytes` times the ranks of a
+  replica when the recipe sets it. Otherwise it is an estimate:
+  `gpu-memory-utilization` (default 0.9) of the smallest matching card,
+  times the ranks, minus the weights (`requires.download_gb`). A recipe
+  without `kv_bytes_per_token` or a numeric `max-model-len` skips the check.
+
+`kv_bytes_per_token` is a measured value: the KV reserve divided by the
+tokens vLLM reports for it, at the recipe's parallel layout and cache
+dtype. The ranks of a replica are `requires.gpus` divided by
+`data-parallel-size`.
+
+`up` and `status` pick a recipe that `fits` before one that is `tight`.
 
 ### 7.9 Setting reasons
 
@@ -1159,6 +1190,26 @@ The `settings` array is sorted by `setting`. `value` is the final rendered
 value as a string. The array is absent when the recipe has no reasons, so a
 legacy recipe keeps the same plan JSON. The MCP `recipe_plan` tool and the
 dashboard use this same plan document.
+
+### 7.10 Plan adjustments
+
+A plan changes a recipe setting only to make the recipe fit this host. Each
+change is one entry of `adjustments` in the JSON plan, with `setting`,
+`from`, `to` and `reason`. The text plan prints it as `# adjusted:`, and
+`serve`, `compose` and `up` print it before they start. The field is absent
+when the plan changed nothing.
+
+The one adjustment is the context:
+
+- When one request of `args.max-model-len` does not fit the KV budget
+  (§7.8), the plan lowers `max-model-len` to the largest of 32768, 16384
+  and 8192 that is smaller than the old value and fits.
+- When none fits, the plan keeps the value and adds a warning that names
+  the budget.
+- An override (a config default or `--set`) of `args.max-model-len` is
+  never changed. When it does not fit, the plan keeps it and warns.
+- An override of `args.kv-cache-memory-bytes` changes the budget the plan
+  compares with.
 
 ## 8. Runs
 
@@ -1294,14 +1345,26 @@ comment.
 the pull. Tags such as `v0.31.0-extras` are refreshed in place, so the tag
 alone does not identify the image.
 
-`ps` state is derived from the process (or container) and `/health`. The
-state is not stored in `run.json`:
+`ps` state is derived from the process (or container), `/health` and one
+completion. The state is not stored in `run.json`:
 
 | State | Meaning |
 |---|---|
-| `starting` | The process or container is alive. `/health` does not answer 200. |
-| `running` | The process or container is alive. `/health` answers 200. |
+| `starting` | The process or container is alive. `/health` does not answer 200, or the server has not answered a completion yet. |
+| `running` | The process or container is alive. `/health` answers 200 and the server answered a one-token completion. |
 | `exited` | The process or container is gone, whether `stop` ended it or it failed. |
+
+A run is `running` only when it answers. Once `/health` answers, bernie
+sends one streaming completion of `max_tokens: 1` to the served model (the
+plan's served name, else the first id of `/v1/models`), with a 10 second
+limit. The first answer is recorded in `<state>/runs/<name>/answered` with
+the start time of the run, so a later `ps` does not ask again and a new run
+of the same name asks afresh.
+
+A `starting` run has a `waiting` string in `ps --json` and `status --json`:
+what it waits for, for example `the server answers /health but not a
+completion yet: HTTP 503`. The field is absent for a `running` or `exited`
+run.
 
 An exited run has a `findings` array in `ps --json` and `status --json` when
 the scan of its log ([§5.3](#53-log-doctor)) matched at least one rule. Each

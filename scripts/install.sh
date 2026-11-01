@@ -116,6 +116,15 @@ assume_yes=0
 from_source=0
 
 while [ $# -gt 0 ]; do
+    # A flag that takes a value needs one; set -u would abort on $2.
+    case "$1" in
+        --version|--dir|--listen|--container-dir)
+            if [ $# -lt 2 ]; then
+                printf 'bernie: %s needs a value\n\n' "$1" >&2
+                usage >&2
+                exit 2
+            fi ;;
+    esac
     case "$1" in
         --version) version=$2; shift 2 ;;
         --dir)     bin_dir=$2; shift 2 ;;

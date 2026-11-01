@@ -1,7 +1,7 @@
 // "The GPUs and the settings of this plan" disclosure of the recipe plan.
 // Loaded lazily so the first paint stays under budget. Holds the GPU
 // selection (ia.md R44) and the "Save as default" button (ia.md R43).
-// Adapted from vllm-rdna-dash by CrispyGinger, used with permission.
+// Adapted from vllm-rdna-dash by CrispyGinger (Apache-2.0).
 "use strict";
 
 /** setupPlanAdjustBody is the disclosure body: GPU checkboxes, a one-line

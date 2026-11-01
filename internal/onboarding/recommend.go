@@ -48,7 +48,7 @@ func recommend(f *Facts) *Recommendation {
 	}
 	r := &Recommendation{ID: e.ID, Name: e.Name, Description: e.Description, Why: recommendWhy(f, e)}
 	for _, o := range f.Recipes.Recipes {
-		if o.ID != e.ID && o.Fit.Status == recipe.FitYes {
+		if o.ID != e.ID && o.Fit.Usable() {
 			r.Alternatives = append(r.Alternatives, o.ID)
 		}
 	}

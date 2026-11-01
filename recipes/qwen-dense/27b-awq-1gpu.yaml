@@ -48,6 +48,10 @@ requires:
   gpus: 1
   vram_gib: 28
   ram_gib: 32
+  download_gb: 21                 # 19.57 GiB in the HF cache
+  # Measured 2026-10-30 on one V620: the 5e9-byte KV reserve held 63,811
+  # tokens with the FP16 KV cache and 1024-token blocks (5e9 / 63,811).
+  kv_bytes_per_token: 78356
 
 env:
   # W4A16 is the native RDNA2 dense GEMM path. W4A8 is a TP4 prefill

@@ -7,7 +7,7 @@
 // from GET /api/gpus/history. The view never opens a fetch or a timer of its
 // own: the stream lives in js/data.js.
 //
-// Adapted from vllm-rdna-dash by CrispyGinger, used with permission.
+// Adapted from vllm-rdna-dash by CrispyGinger (Apache-2.0).
 
 const dash = {
   samples: [],   // the compact telemetry ring buffer (one hour of samples)
@@ -118,7 +118,7 @@ function dashLiveRun() {
 function dashPhase(run) {
   if (!run) return "";
   if (run.phase && run.phase.sentence) return run.phase.sentence;
-  if (run.state === "starting") return "The server is loading the model.";
+  if (run.state === "starting") return run.waiting || "The server is loading the model.";
   return "";
 }
 

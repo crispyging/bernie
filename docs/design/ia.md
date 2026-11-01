@@ -646,9 +646,8 @@ needs your password shows up as a command to paste") but does not always do.
 
 The reference is `vllm-rdna-dash` by CrispyGinger, HEAD `74fb1d8`
 (`~/.cache/minimax-researcher/vllm-rdna-dash`), live demo at
-`http://127.0.0.1:18095/`. Its repository carries no licence, so bernie
-re-implements its behaviour in its own words; the layout, the palette and the
-interaction patterns are used with the author's permission
+`http://127.0.0.1:18095/`. It is licensed under Apache-2.0, so bernie may
+take its markup, CSS and copy; an adapted file names the source in its header
 ([../design-dashboard.md](../design-dashboard.md) §5).
 
 **Rule for this section: no feature of the reference is dropped.** Every

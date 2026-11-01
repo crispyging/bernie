@@ -1,5 +1,5 @@
 // The facts of the host on the Setup tab: the numbers and why they matter.
-// Adapted from vllm-rdna-dash by CrispyGinger, used with permission.
+// Adapted from vllm-rdna-dash by CrispyGinger (Apache-2.0).
 "use strict";
 
 /** paintSetupFacts draws the plan of the host and the facts under it. */
