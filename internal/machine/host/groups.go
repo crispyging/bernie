@@ -51,7 +51,7 @@ func gpuGroups(ctx context.Context, root string, r runner) []DeviceGroup {
 	var out []DeviceGroup
 	seen := map[int]bool{}
 	covered := map[string]bool{}
-	for _, d := range gpuDevices(root) {
+	for _, d := range listGPUDevices(root) {
 		gid, ok := statGID(filepath.Join(root, d.path))
 		if !ok {
 			continue
@@ -82,6 +82,10 @@ func gpuGroups(ctx context.Context, root string, r runner) []DeviceGroup {
 	sort.Slice(out, func(i, j int) bool { return out[i].GID < out[j].GID })
 	return out
 }
+
+// listGPUDevices is gpuDevices; a test of the root "/" replaces it, so the
+// device nodes of the machine that runs the test do not count.
+var listGPUDevices = gpuDevices
 
 // gpuDevices are the device nodes a container opens for the GPUs.
 func gpuDevices(root string) []gpuDevice {
