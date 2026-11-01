@@ -2,6 +2,7 @@ package onboarding
 
 import (
 	"context"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -9,20 +10,21 @@ import (
 )
 
 // stubGather replaces the probe of the host with one that counts its runs.
-func stubGather(t *testing.T, calls *int) {
+// The count is atomic: a stale document is refreshed in the background.
+func stubGather(t *testing.T, calls *atomic.Int32) {
 	t.Helper()
 	old := gather
 	oldTTL := DocumentTTL
 	t.Cleanup(func() { gather = old; DocumentTTL = oldTTL })
 	gather = func(context.Context, Options) (*Facts, error) {
-		*calls++
+		calls.Add(1)
 		return &Facts{GPUs: []gpu.GPU{}}, nil
 	}
 }
 
 func TestLoadProbesTheHostOnce(t *testing.T) {
 	t.Setenv("BERNIE_STATE_DIR", t.TempDir())
-	calls := 0
+	var calls atomic.Int32
 	stubGather(t, &calls)
 
 	doc, err := Load(context.Background(), Options{})
@@ -36,8 +38,8 @@ func TestLoadProbesTheHostOnce(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if calls != 1 {
-		t.Errorf("the host was probed %d times, want 1", calls)
+	if calls.Load() != 1 {
+		t.Errorf("the host was probed %d times, want 1", calls.Load())
 	}
 	if doc.Stale {
 		t.Error("a cached document younger than its time to live is stale")
@@ -46,9 +48,9 @@ func TestLoadProbesTheHostOnce(t *testing.T) {
 
 func TestLoadServesTheStaleDocument(t *testing.T) {
 	t.Setenv("BERNIE_STATE_DIR", t.TempDir())
+	var calls atomic.Int32
+	stubGather(t, &calls) // saves the TTL first, so cleanup restores it
 	DocumentTTL = time.Millisecond
-	calls := 0
-	stubGather(t, &calls)
 
 	if _, err := Load(context.Background(), Options{}); err != nil {
 		t.Fatal(err)
@@ -67,7 +69,7 @@ func TestLoadServesTheStaleDocument(t *testing.T) {
 	// The refresh runs in the background.
 	deadline := time.Now().Add(5 * time.Second)
 	for time.Now().Before(deadline) {
-		if calls > 1 {
+		if calls.Load() > 1 {
 			return
 		}
 		time.Sleep(10 * time.Millisecond)
@@ -77,7 +79,7 @@ func TestLoadServesTheStaleDocument(t *testing.T) {
 
 func TestLoadKeepsTheOptionsApart(t *testing.T) {
 	t.Setenv("BERNIE_STATE_DIR", t.TempDir())
-	calls := 0
+	var calls atomic.Int32
 	stubGather(t, &calls)
 
 	if _, err := Load(context.Background(), Options{}); err != nil {
@@ -86,14 +88,14 @@ func TestLoadKeepsTheOptionsApart(t *testing.T) {
 	if _, err := Load(context.Background(), Options{Recipe: "qwen"}); err != nil {
 		t.Fatal(err)
 	}
-	if calls != 2 {
-		t.Errorf("the host was probed %d times, want 2: other options are other facts", calls)
+	if calls.Load() != 2 {
+		t.Errorf("the host was probed %d times, want 2: other options are other facts", calls.Load())
 	}
 }
 
 func TestLoadKeepsTheRootsApart(t *testing.T) {
 	t.Setenv("BERNIE_STATE_DIR", t.TempDir())
-	calls := 0
+	var calls atomic.Int32
 	stubGather(t, &calls)
 
 	if _, err := Load(context.Background(), Options{Root: "/srv/one"}); err != nil {
@@ -102,7 +104,7 @@ func TestLoadKeepsTheRootsApart(t *testing.T) {
 	if _, err := Load(context.Background(), Options{Root: "/srv/two"}); err != nil {
 		t.Fatal(err)
 	}
-	if calls != 2 {
-		t.Errorf("the host was probed %d times, want 2: another host tree is another fact", calls)
+	if calls.Load() != 2 {
+		t.Errorf("the host was probed %d times, want 2: another host tree is another fact", calls.Load())
 	}
 }

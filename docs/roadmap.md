@@ -11,21 +11,32 @@ Each item has a spec section and one test that proves it.
 
 ## Next: make `up` work the first time
 
-| # | Item | Spec | Test |
-|---|---|---|---|
-| 6 | **Next command in every state.** `status --json` has `next` for: no GPU, no recipe fits, recipe fits, run starting, run ready. | §3.1 | Fixture set covers the five states. |
+Every item of this group has shipped.
 
 ## Then: honest results and connected clients
 
-| # | Item | Spec | Test |
-|---|---|---|---|
-| 7 | **Model file hashes.** A result stores the hashes of the model files it measured, so a number can be tied to the exact weights. | §10 | A result of a run holds the hashes of the model files. |
-| 8 | **Redacted report.** `doctor --report` writes JSON with no hostname, user name, home paths or keys, and lists what it removed. | §5 | `grep` for user, host and `/home/` finds nothing. |
-| 9 | **Smoke chat.** `bernie chat --run NAME "prompt"` sends one prompt, prints the reply, time to first token and tok/s. It proves the server works. | §3 | Prints reply, TTFT and tok/s for a fixture server; exits non-zero when the run is not ready. |
-| 10 | **`connect <app>`.** Prints the ready-to-paste config for opencode, Open WebUI or a generic OpenAI client, using the run's port and model name. It prints only; it writes nothing. | §3 | `connect opencode` output contains the run's base URL and served model name. |
+Every item of this group has shipped.
 
 ## Shipped
 
+- **Model file hashes.** A bench result stores `weights`: the files of the
+  model the run loads with the SHA-256 of each, read from the blob names of
+  the hub cache or hashed once for a local directory. Spec
+  [§10](spec.md#10-benchmark).
+- **Redacted report.** `doctor --report` cleans every line of the share
+  report: the home path, the user name, the hostname and secrets by shape.
+  `removed` lists each kind with the number of places it was taken out.
+  Spec [§3.2](spec.md#32-rules).
+- **Smoke chat.** `bernie chat [--run NAME] "PROMPT"` streams the answer of
+  the run and prints the time to the first token and the tok/s. It refuses
+  a run that is not ready. Spec [§3.2](spec.md#32-rules).
+- **`connect <app>`.** `bernie connect openai|opencode|openwebui` prints
+  the config of the app with the base URL and the model name the server
+  answers to. It prints only. Spec [§3.2](spec.md#32-rules).
+- **Next command in every state.** `status --json` has its own `next` for
+  no GPU, no recipe fits, a recipe fits, a run starting and a run running.
+  A starting run points at its log and says what it waits for; it is not
+  benchmarked. Spec [§3.1](spec.md#31-the-default-run-the-binary).
 - **Log doctor on failure.** When a run exits during startup, `serve` and
   `up` scan its log and print every matched rule: id, cause, fix, doc link
   and the line. `--json` carries them in `log_findings`. Spec

@@ -230,27 +230,29 @@ func (s *RunStore) List() ([]*Run, error) {
 	return out, nil
 }
 
-// Prune removes the runs beyond the newest keep. The pointer to the
-// newest run stays.
+// Prune removes the runs beyond the newest keep, in the order of List: by
+// the start time of the record. Two runs of the same second have ids that
+// sort by their random tail, not by time, so the names are not the order.
+// The run the latest pointer names is never removed.
 func (s *RunStore) Prune(keep int) {
 	if keep < 1 {
 		return
 	}
-	entries, err := os.ReadDir(s.Root)
-	if err != nil {
+	runs, err := s.List()
+	if err != nil || len(runs) <= keep {
 		return
 	}
-	var dirs []string
-	for _, e := range entries {
-		if e.IsDir() {
-			dirs = append(dirs, e.Name())
-		}
+	latest := ""
+	if b, err := os.ReadFile(filepath.Join(s.Root, "latest")); err == nil {
+		latest = strings.TrimSpace(string(b))
 	}
-	// The ids start with the time of the run, so the name sorts by time.
-	sort.Strings(dirs)
-	for len(dirs) > keep {
-		os.RemoveAll(s.Dir(dirs[0]))
-		dirs = dirs[1:]
+	kept := 0
+	for _, r := range runs {
+		if kept < keep || r.ID == latest {
+			kept++
+			continue
+		}
+		os.RemoveAll(s.Dir(r.ID))
 	}
 }
 

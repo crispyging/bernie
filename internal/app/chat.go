@@ -2,8 +2,12 @@ package app
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	"strings"
 
 	"github.com/opengfx1030/bernie/internal/onboarding"
+	"github.com/opengfx1030/bernie/internal/serving/runner"
 	"github.com/opengfx1030/bernie/internal/serving/vllm"
 )
 
@@ -45,4 +49,58 @@ func ChatStream(ctx context.Context, o ChatOptions) (*vllm.ChatStream, error) {
 		url = run.URL
 	}
 	return vllm.New(url).ChatStream(ctx, o.Model, o.Prompt, o.MaxTokens)
+}
+
+// ChatAnswer is the `chat --json` document: one prompt, the answer and its
+// numbers (spec §3.2).
+type ChatAnswer struct {
+	Run       string `json:"run"`
+	Model     string `json:"model"`
+	Reply     string `json:"reply"`
+	Reasoning string `json:"reasoning,omitempty"`
+	// TTFTMS is the time to the first token of the answer, in milliseconds.
+	TTFTMS       int     `json:"ttft_ms"`
+	OutputTokens int     `json:"output_tokens"`
+	TokS         float64 `json:"tok_s"`
+}
+
+// ErrNotReady means the run exists but does not answer requests yet.
+var ErrNotReady = errors.New("the run is not ready")
+
+// Chat sends one prompt to a run (by name, else the run that serves) and
+// streams the answer to onDelta (nil = no stream). A run that is not
+// running yet is ErrNotReady: chat proves that the server answers.
+func Chat(ctx context.Context, run, prompt string, maxTokens int, onDelta func(ChatDelta) error) (*ChatAnswer, error) {
+	if strings.TrimSpace(prompt) == "" {
+		return nil, errors.New("the prompt is empty")
+	}
+	var r *onboarding.Run
+	var err error
+	if run != "" {
+		r, err = onboarding.RunByName(ctx, run)
+	} else {
+		r, err = onboarding.LiveRun(ctx)
+	}
+	if err != nil {
+		return nil, err
+	}
+	if r.State != runner.StateRunning {
+		return nil, fmt.Errorf("%w: %s is %s; see: bernie ps", ErrNotReady, r.Name, r.State)
+	}
+	s, err := vllm.New(r.URL).ChatStream(ctx, "", prompt, maxTokens)
+	if err != nil {
+		return nil, err
+	}
+	defer s.Close()
+	if onDelta == nil {
+		onDelta = func(ChatDelta) error { return nil }
+	}
+	res, err := s.Read(onDelta)
+	if err != nil {
+		return nil, err
+	}
+	return &ChatAnswer{
+		Run: r.Name, Model: s.Model(), Reply: res.Text, Reasoning: res.Reasoning,
+		TTFTMS: int(res.TTFT.Milliseconds()), OutputTokens: res.Tokens, TokS: res.TokS,
+	}, nil
 }

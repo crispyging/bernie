@@ -11,6 +11,7 @@ import (
 	"reflect"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
@@ -65,7 +66,8 @@ func TestStdioSession(t *testing.T) {
 
 	cmd := exec.Command(os.Args[0])
 	cmd.Env = append(os.Environ(), "BERNIE_TEST_AS_MCP=1")
-	var stderr bytes.Buffer
+	// The child's stderr is copied in while the test reads it.
+	var stderr lockedBuffer
 	cmd.Stderr = &stderr
 	ctx := context.Background()
 	cs, err := sdk.NewClient(&sdk.Implementation{Name: "stdio-test", Version: "1"}, nil).Connect(ctx, &sdk.CommandTransport{Command: cmd}, nil)
@@ -114,6 +116,31 @@ func TestStdioSession(t *testing.T) {
 	if stderr.Len() == 0 {
 		t.Error("the server should log its start on stderr")
 	}
+}
+
+// lockedBuffer is a bytes.Buffer that one goroutine writes while another
+// reads.
+type lockedBuffer struct {
+	mu sync.Mutex
+	b  bytes.Buffer
+}
+
+func (l *lockedBuffer) Write(p []byte) (int, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.b.Write(p)
+}
+
+func (l *lockedBuffer) String() string {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.b.String()
+}
+
+func (l *lockedBuffer) Len() int {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.b.Len()
 }
 
 func roundTrip(t *testing.T, v any) any {

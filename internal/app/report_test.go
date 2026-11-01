@@ -5,6 +5,7 @@ package app
 // username, no token and no path with the name of the user.
 
 import (
+	"encoding/json"
 	"os"
 	"strings"
 	"testing"
@@ -82,5 +83,55 @@ func TestReportRedactsTheHomeDirectory(t *testing.T) {
 	}
 	if !strings.Contains(s, "~/x") {
 		t.Errorf("the home directory is not shortened: %q", s)
+	}
+}
+
+// The JSON form carries no identity either, and it lists what it removed:
+// a hostname inside a check, the user, the home path and a token.
+func TestReportJSONListsWhatItRemoved(t *testing.T) {
+	name := "opsperson"
+	t.Setenv("USER", name)
+	home := "/home/" + name
+	t.Setenv("HOME", home)
+	h := host.Info{Hostname: "gpu-box-7", Kernel: "6.9.0", User: host.User{Name: name, Home: home}}
+	rep := doctor.Report{
+		Summary: map[doctor.Status]int{doctor.Warn: 2},
+		Checks: []doctor.Check{
+			{ID: "net.dash", Status: doctor.Warn, Title: "dashboard",
+				Detail: "listening on gpu-box-7:7860 with HF_TOKEN=hf_abcdefghijklmnopqrstuvwxyz0123"},
+			{ID: "venv", Status: doctor.Warn, Title: "venv",
+				Detail: home + "/venv is old", Fix: "rm -rf " + home + "/venv"},
+		},
+	}
+	doc := buildShareReport(h, nil, rep)
+	b, err := json.Marshal(doc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, bad := range []string{"gpu-box-7", name, "/home/", "hf_abcdefghij"} {
+		if strings.Contains(string(b), bad) {
+			t.Errorf("the JSON report carries %q:\n%s", bad, b)
+		}
+	}
+	got := map[string]int{}
+	for _, r := range doc.Removed {
+		got[r.What] = r.Count
+	}
+	want := map[string]int{"hostname": 1, "home path": 2, "secret": 1, "user name": 0}
+	for k, v := range want {
+		if got[k] != v {
+			t.Errorf("removed %s = %d, want %d (all: %v)", k, got[k], v, doc.Removed)
+		}
+	}
+	if !strings.Contains(doc.Report, "Removed: 1 hostname, 2 home path, 1 secret.") {
+		t.Errorf("the text does not say what it removed:\n%s", doc.Report)
+	}
+}
+
+// A short hostname is removed as a word only: it does not cut other words.
+func TestReportKeepsWordsThatHoldTheHostname(t *testing.T) {
+	sc := newScrubber("vm")
+	if got := sc.clean("vmlinuz on vm"); got != "vmlinuz on <host>" {
+		t.Errorf("clean = %q", got)
 	}
 }

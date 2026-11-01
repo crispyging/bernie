@@ -145,6 +145,20 @@ other file, script or compose file is required.
   it and the step to do now. `status --json` carries the same steps in the
   `onboarding` field. `--steps` changes the human text only: the JSON
   document is the same with and without it.
+
+  `status --json` has `next`: the commands to type now, most important
+  first. Each state of the host has its own:
+
+  | State | `next` |
+  |---|---|
+  | No GPU is usable | the fix of the blocking check, with the reason after `#` |
+  | No recipe fits | `bernie recipe list --all   # No recipe fits this host.` |
+  | A recipe fits, nothing serves | `bernie up RECIPE` |
+  | A run is starting | `bernie logs NAME -f   # NAME is starting: WAITING`, then `bernie dash` |
+  | A run is running | `bernie dash`, then `bernie bench` |
+
+  A run is starting until it answers a completion ([§8.3](#83-run-record))
+  and while its log shows a loading phase. WAITING is its `waiting` reason.
 - `bernie setup apply` runs the steps of the install plan
   ([\u00a76](#6-setup)). It streams one line per step and keeps the log of
   every step. `bernie setup report` prints the record of the run and
@@ -244,6 +258,7 @@ other file, script or compose file is required.
 | `bernie topo --check [--recipe ID]` | no | P2P readiness checklist ([§4.5](#45-p2p-readiness-checklist)). Exit 3 if an item fails. |
 | `bernie doctor [--category C]... [--venv DIR]` | no | All checks. Exit 3 if one check fails. |
 | `bernie doctor --log FILE\|-` / `doctor --run NAME` | no | Match a vLLM log against known failures ([§5.3](#53-log-doctor)). |
+| `bernie doctor --report` | no | The share report of this host: the OS, the kernel, the CPU, the RAM, the cards and every check that did not pass, as markdown. Every line is cleaned: the home directory becomes `~`, the user name `<user>`, the hostname `<host>` (as a whole word) and a secret `<redacted>` ([§11](#11-dashboard) redaction). `removed` lists each kind (`hostname`, `user name`, `home path`, `secret`) with the number of places it was taken out, also when it is 0, and the text ends with the same list. `--json` prints `{"report", "sections", "removed"}`. |
 | `bernie setup plan [--mode M] [--venv DIR] [--image I] [--model M]` | no | Ordered install steps for this host. |
 | `bernie setup apply [--mode M] [--step ID]... [--yes] [--venv DIR] [--image I] [--model M] [-v]` | yes | Run the steps that do not need root. Print the root steps. `-v` also streams the raw output of the steps. |
 | `bernie setup verify [--venv DIR] [-v]` | yes (its own run record) | Run the check of the venv again, even when it passed before: versions of the main parts, the fork ops, the libraries. It records a run, so `setup report` shows fresh evidence. Exit code 1 when a check fails. The MCP tool `setup_verify` ([§13.4](#134-tools)) and the button of the venv detail of the dashboard ([§11](#11-dashboard)) run the same check and leave the same record. |
@@ -254,6 +269,8 @@ other file, script or compose file is required.
 | `bernie serve <id> [--set K=V]... [--mode M] [--name N] [--venv DIR] [--engine E] [--device-access A] [--profile P] [--no-tunableop] [--tuning] [--foreground] [--no-pull] [--wait D] [--dash[=ADDR]] [--dry-run]` | yes | Start a run. |
 | `bernie ps` | no | Runs, with state and health. For an exited run: the known failures in its log. |
 | `bernie smoke [--url URL] [--model NAME]` | no | Check that the running server answers: `/health`, then one chat completion of `What is 2+2? Answer with one number.` so the model applies its chat template. The answer carries the time to the first token, the number of tokens and the output speed under `--json`; the human output prints the server, the model, the answer, the verdict of the check (`ok: contains 4` or `answered`), the TTFT and the tok/s. `--url` picks the server (default: the running run). |
+| `bernie chat [--run NAME] [--max-tokens N] "PROMPT"` | no | Send one prompt to the run (default: the run that serves) and stream the answer to stdout as it comes. The reasoning of a model that sends one goes to stderr, and so does the last line: the run, the model, the time to the first token, the tokens and the tok/s. `--json` streams nothing and prints `{"run", "model", "reply", "reasoning", "ttft_ms", "output_tokens", "tok_s"}`. A run that is not `running` ([§8.3](#83-run-record)) is refused and the exit code is not 0. |
+| `bernie connect [openai\|opencode\|openwebui] [--run NAME]` | no | Print the config an app needs to use the run: the base URL (`<run URL>/v1`) and the model name, which is the first id of the server's `/v1/models`. `openai` (the default) prints the `OPENAI_*` variables and a `curl` call, `opencode` an `opencode.json` provider, `openwebui` the variables of its OpenAI connection. stdout holds only the config, so it can be redirected into a file; where it goes is a comment on stderr. `--json` prints `{"app", "run", "base_url", "model", "where", "config"}`. It writes nothing. |
 | `bernie stop [NAME]` | yes | Stop a run (the only run if NAME is absent). |
 | `bernie logs [NAME] [-f] [--tail N]` | no | Show the log of a run. |
 | `bernie compose <id> [--set K=V]... [--mode M] [--name N] [--venv DIR] [--engine E] [--device-access A] [--profile P] [--no-tunableop] [--tuning] [-o FILE]` | no* | Write a `compose.yml` for the plan (*writes FILE only). |
@@ -1536,6 +1553,18 @@ in the matching run record. When there is no matching run record, or its plan
 has no GPU selection, the summary lists every host GPU and `gpu_scope` is
 `all (run selection unknown)`. A known run selection has `gpu_scope` `run`.
 The text and dashboard history show the same summary and scope.
+
+`weights` names the model files the run loads, so a number is tied to the
+exact weights it measured: `{"source", "commit", "files": [{"path",
+"bytes", "sha256", "git_sha1"}]}`. For an HF repo, bernie reads the
+snapshot of the run's revision in the hub cache of the plan (`HF_HOME`,
+else the config): each file links to a blob named by its hash, so nothing
+is read again. `sha256` is the hash of an LFS file; a small file kept in git
+has its git blob hash in `git_sha1` instead. For a local directory, bernie
+hashes every file with SHA-256 and keeps the hashes in
+`<cache>/weights/`, keyed by path, size and modification time, so the
+weights are read once. `weights` is absent for a server bernie did not
+start (no plan) and when the files cannot be read.
 
 ### 10.1 What the numbers mean
 

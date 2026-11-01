@@ -6,6 +6,8 @@ package bench
 import (
 	"fmt"
 	"time"
+
+	"github.com/opengfx1030/bernie/internal/serving/weights"
 )
 
 // Defaults of spec §10.
@@ -211,7 +213,10 @@ type Result struct {
 	// Suite names the suite that produced the result. It is nil for a
 	// plain run.
 	Suite *SuiteRef `json:"suite,omitempty"`
-	Cells []Cell    `json:"cells"`
+	// Weights are the model files the run loads, with their hashes. It is
+	// nil for a server bernie did not start and in older results.
+	Weights *weights.Model `json:"weights,omitempty"`
+	Cells   []Cell         `json:"cells"`
 }
 
 // Completed is the number of successful measured requests over all cells.

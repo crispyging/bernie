@@ -238,16 +238,7 @@ func fingerprint(stateDir, rawURL string) map[string]string {
 	if h, err := os.Hostname(); err == nil {
 		fp["host"] = h
 	}
-	var matched *runRecord
-	if u, err := url.Parse(rawURL); err == nil {
-		for _, r := range runRecords(stateDir) {
-			if sameEndpoint(u, r) {
-				r := r
-				matched = &r
-				break
-			}
-		}
-	}
+	matched := matchRun(stateDir, rawURL)
 	if matched != nil {
 		fp["run"] = matched.Name
 		if matched.Recipe != "" {

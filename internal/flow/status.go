@@ -10,6 +10,7 @@ import (
 	"github.com/opengfx1030/bernie/internal/machine/gpu"
 	"github.com/opengfx1030/bernie/internal/machine/host"
 	"github.com/opengfx1030/bernie/internal/onboarding"
+	"github.com/opengfx1030/bernie/internal/serving/runner"
 	"github.com/opengfx1030/bernie/internal/setup"
 )
 
@@ -83,8 +84,11 @@ func next(s *Summary) []string {
 	if doc == nil {
 		return []string{"bernie doctor   # the host state is unknown"}
 	}
-	if running(doc.Steps) {
-		return []string{"bernie dash", "bernie bench"}
+	if serve := findStep(doc.Steps, onboarding.StepServe); serve != nil && serve.State == onboarding.StateRunning {
+		if serve.Serving {
+			return []string{"bernie dash", "bernie bench"}
+		}
+		return startingNext(s.Runs)
 	}
 	step := findStep(doc.Steps, doc.Next)
 	if step == nil {
@@ -101,14 +105,20 @@ func next(s *Summary) []string {
 	return []string{step.Command}
 }
 
-// running reports whether a step is running now (the server loads).
-func running(steps []onboarding.Step) bool {
-	for _, s := range steps {
-		if s.ID == onboarding.StepServe && s.State == onboarding.StateRunning {
-			return true
+// startingNext follows a run that does not answer yet: its log, with what
+// it waits for, then the dashboard. Benchmarking it would measure nothing.
+func startingNext(runs []Run) []string {
+	for _, r := range runs {
+		if r.State == runner.StateExited {
+			continue
 		}
+		why := r.Waiting
+		if why == "" {
+			why = "the server is loading the model"
+		}
+		return []string{"bernie logs " + r.Name + " -f   # " + r.Name + " is starting: " + why, "bernie dash"}
 	}
-	return false
+	return []string{"bernie logs -f   # the server is loading the model", "bernie dash"}
 }
 
 // findStep returns the step with the given id, or nil.
