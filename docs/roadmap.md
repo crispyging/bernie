@@ -18,10 +18,13 @@ Every item of this group has shipped.
 | # | Item | Spec | Test |
 |---|---|---|---|
 | 7 | **Model file hashes.** A result stores the hashes of the model files it measured, so a number can be tied to the exact weights. | §10 | A result of a run holds the hashes of the model files. |
-| 8 | **Redacted report.** `doctor --report` writes JSON with no hostname, user name, home paths or keys, and lists what it removed. | §5 | `grep` for user, host and `/home/` finds nothing. |
 
 ## Shipped
 
+- **Redacted report.** `doctor --report` cleans every line of the share
+  report: the home path, the user name, the hostname and secrets by shape.
+  `removed` lists each kind with the number of places it was taken out.
+  Spec [§3.2](spec.md#32-rules).
 - **Smoke chat.** `bernie chat [--run NAME] "PROMPT"` streams the answer of
   the run and prints the time to the first token and the tok/s. It refuses
   a run that is not ready. Spec [§3.2](spec.md#32-rules).
