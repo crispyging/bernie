@@ -19,11 +19,15 @@ Every item of this group has shipped.
 |---|---|---|---|
 | 7 | **Model file hashes.** A result stores the hashes of the model files it measured, so a number can be tied to the exact weights. | §10 | A result of a run holds the hashes of the model files. |
 | 8 | **Redacted report.** `doctor --report` writes JSON with no hostname, user name, home paths or keys, and lists what it removed. | §5 | `grep` for user, host and `/home/` finds nothing. |
-| 9 | **Smoke chat.** `bernie chat --run NAME "prompt"` sends one prompt, prints the reply, time to first token and tok/s. It proves the server works. | §3 | Prints reply, TTFT and tok/s for a fixture server; exits non-zero when the run is not ready. |
-| 10 | **`connect <app>`.** Prints the ready-to-paste config for opencode, Open WebUI or a generic OpenAI client, using the run's port and model name. It prints only; it writes nothing. | §3 | `connect opencode` output contains the run's base URL and served model name. |
 
 ## Shipped
 
+- **Smoke chat.** `bernie chat [--run NAME] "PROMPT"` streams the answer of
+  the run and prints the time to the first token and the tok/s. It refuses
+  a run that is not ready. Spec [§3.2](spec.md#32-rules).
+- **`connect <app>`.** `bernie connect openai|opencode|openwebui` prints
+  the config of the app with the base URL and the model name the server
+  answers to. It prints only. Spec [§3.2](spec.md#32-rules).
 - **Next command in every state.** `status --json` has its own `next` for
   no GPU, no recipe fits, a recipe fits, a run starting and a run running.
   A starting run points at its log and says what it waits for; it is not

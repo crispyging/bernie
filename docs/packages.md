@@ -16,7 +16,7 @@ Packages are grouped by role: `internal/machine` (what the host is),
 | `internal/cli` | the command framework | `Register`, `Main`, `Command`, `Context`, `ExitError`, `WriteMatches` | 4 |
 | `internal/cli/cmds/health` | `doctor`, `setup`, `status`, `up` | `cli.Register` per command | 4 |
 | `internal/cli/cmds/inventory` | `hw`, `topo` | `cli.Register` per command | 4 |
-| `internal/cli/cmds/serving` | `recipe`, `serve`, `ps`, `stop`, `logs`, `compose`, `config` | `cli.Register` per command | 4 |
+| `internal/cli/cmds/serving` | `recipe`, `serve`, `ps`, `stop`, `logs`, `compose`, `config`, `attach`, `smoke`, `chat`, `connect` | `cli.Register` per command | 4 |
 | `internal/cli/cmds/tunecmd` | `tune` | `cli.Register` per command | 4 |
 | `internal/cli/cmds/benchcmd` | `bench` | `cli.Register` per command | 4 |
 | `internal/cli/cmds/dashcmd` | `dash` | `cli.Register` per command | 4 |
@@ -28,7 +28,7 @@ Packages are grouped by role: `internal/machine` (what the host is),
 | `dashboard/internal/httpjson` | the JSON response shapes and the redaction | `Write`, `Error`, `Decode`, `Redacted` | 4 |
 | `dashboard/internal/sse` | the server-sent event writer | `New`, `Stream`, `LineWriter`, `Heartbeat` | 4 |
 | `dashboard/internal/telemetry` | the 1 Hz sampler and the hub that shares it | `NewHub`, `Hub`, `Sampler` | 4 |
-| `internal/app` | the operations the front ends share | `HW`, `Topo`, `Doctor`, `RecipeList`, `SetupPlan`, `SetupApply`, `SetupRuns`, `SetupRun`, `SetupLatestRun`, `Serve`, `Plan`, `Bench`, `BenchSuite`, `BenchCompare`, `PowerStatus`, `Onboarding`, `RunOnboardingStep`, `Stop`, `Smoke` | 3 |
+| `internal/app` | the operations the front ends share | `HW`, `Topo`, `Doctor`, `RecipeList`, `SetupPlan`, `SetupApply`, `SetupRuns`, `SetupRun`, `SetupLatestRun`, `Serve`, `Plan`, `Bench`, `BenchSuite`, `BenchCompare`, `PowerStatus`, `Onboarding`, `RunOnboardingStep`, `Stop`, `Smoke`, `Chat`, `Connect` | 3 |
 | `internal/flow` | the `status` snapshot and the `up` chain | `Summary`, `Up`, `Findings`, `WaitHealthy`, `Blocked` | 3 |
 | `internal/onboarding` | the onboarding checklist | `Gather`, `Build`, `Load`, `PrepareStep`, `ActionFor`, `StartJob`, `Smoke`, `Document`, `Facts` | 3 |
 | `internal/bench/job` | the benchmark jobs: the store, the state machine and the typed progress events | `NewStore`, `Store`, `Request`, `Doc`, `Job`, `Progress` | 3 |
