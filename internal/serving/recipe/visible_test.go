@@ -37,14 +37,14 @@ func mkReq(arch string, n int) *Recipe {
 // GPU visible.
 func TestFitUsesTheVisibleGPUs(t *testing.T) {
 	gpus := visible(t, "8")
-	fit := CheckFit(mkReq("gfx1030", 4), gpus, 0)
+	fit := CheckFit(mkReq("gfx1030", 4), Host{GPUs: gpus})
 	if fit.Status != FitNo {
 		t.Errorf("fit = %+v, want no", fit)
 	}
 	if !strings.Contains(strings.Join(fit.Reasons, " "), "host has 1") {
 		t.Errorf("reasons = %v", fit.Reasons)
 	}
-	if fit := CheckFit(mkReq("gfx1030", 1), gpus, 0); fit.Status != FitYes {
+	if fit := CheckFit(mkReq("gfx1030", 1), Host{GPUs: gpus}); fit.Status != FitYes {
 		t.Errorf("fit = %+v, want fits", fit)
 	}
 }

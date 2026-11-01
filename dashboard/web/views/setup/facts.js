@@ -1,4 +1,4 @@
-// Setup host summary. Adapted from vllm-rdna-dash by CrispyGinger, with permission.
+// Setup host summary. Adapted from vllm-rdna-dash by CrispyGinger (Apache-2.0).
 "use strict";
 
 async function paintSetupFacts(doc) {

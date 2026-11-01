@@ -19,6 +19,9 @@ import (
 type ShareReport struct {
 	Report   string          `json:"report"`
 	Sections []ReportSection `json:"sections"`
+	// Removed says what the report took out, so a reader knows it was
+	// checked: one entry per kind, with the number of places.
+	Removed []Removal `json:"removed"`
 }
 
 // ReportSection is one block of the report.
@@ -120,14 +123,21 @@ func buildShareReport(h host.Info, gpus []gpu.GPU, rep doctor.Report) ShareRepor
 		if c.Fix != "" {
 			line += "\n  fix: " + c.Fix
 		}
-		checkLines = append(checkLines, redactReportText(line))
+		checkLines = append(checkLines, line)
 	}
 	sections = append(sections, ReportSection{Title: "The checks", Lines: checkLines})
 
-	return ShareReport{Report: renderShareReport(sections), Sections: sections}
+	sc := newScrubber(h.Hostname)
+	for i := range sections {
+		for j, l := range sections[i].Lines {
+			sections[i].Lines[j] = sc.clean(l)
+		}
+	}
+	removed := sc.removed()
+	return ShareReport{Report: renderShareReport(sections, removed), Sections: sections, Removed: removed}
 }
 
-func renderShareReport(sections []ReportSection) string {
+func renderShareReport(sections []ReportSection, removed []Removal) string {
 	var b strings.Builder
 	b.WriteString("# bernie host report\n")
 	for _, s := range sections {
@@ -136,58 +146,22 @@ func renderShareReport(sections []ReportSection) string {
 			b.WriteString(l + "\n")
 		}
 	}
-	b.WriteString("\nThis report carries no hostname, no username and no token.\n")
+	b.WriteString("\nThis report carries no hostname, no username, no home path and no token.\n")
+	var parts []string
+	for _, r := range removed {
+		if r.Count > 0 {
+			parts = append(parts, fmt.Sprintf("%d %s", r.Count, r.What))
+		}
+	}
+	if len(parts) == 0 {
+		parts = []string{"nothing"}
+	}
+	b.WriteString("Removed: " + strings.Join(parts, ", ") + ".\n")
 	return b.String()
 }
 
 func gibString(b uint64) string {
 	return fmt.Sprintf("%.1f GiB", float64(b)/(1<<30))
-}
-
-func redactReportText(s string) string {
-	s = redactHome(s)
-	s = redactUserPaths(s)
-	return redactUserName(s)
-}
-
-// redactUserName removes the name of the user from a line, wherever it
-// stands: a path segment, a sentence, a fix. The name of the operator
-// identifies the host, so the report never carries it.
-func redactUserName(s string) string {
-	name := currentUserName()
-	if name == "" || len(name) < 2 {
-		return s
-	}
-	return strings.ReplaceAll(s, name, "<user>")
-}
-
-func redactHome(s string) string {
-	home, err := os.UserHomeDir()
-	if err != nil || home == "" {
-		return s
-	}
-	return strings.ReplaceAll(s, home, "~")
-}
-
-func redactUserPaths(s string) string {
-	name := currentUserName()
-	if name == "" {
-		return s
-	}
-	parts := strings.Split(s, " ")
-	for i, p := range parts {
-		if !strings.HasPrefix(p, "/") {
-			continue
-		}
-		segs := strings.Split(p, "/")
-		for j, seg := range segs {
-			if seg == name {
-				segs[j] = "<user>"
-			}
-		}
-		parts[i] = strings.Join(segs, "/")
-	}
-	return strings.Join(parts, " ")
 }
 
 func currentUserName() string {

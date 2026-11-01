@@ -79,6 +79,7 @@ func TestLoadServesTheStaleDocument(t *testing.T) {
 	if doc.FactsAgeS < 1 {
 		t.Errorf("the age of a stale document = %d, want at least a second", doc.FactsAgeS)
 	}
+
 }
 
 func TestLoadKeepsTheOptionsApart(t *testing.T) {

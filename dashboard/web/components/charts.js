@@ -1,6 +1,5 @@
-// Shared SVG sparklines and single-series area charts, built once and updated.
-// Missing samples stay gaps; keyboard readouts and data tables expose values.
-// Adapted from vllm-rdna-dash by CrispyGinger, used with permission.
+// SVG history preserves gaps, keyboard readouts and data tables.
+// Adapted from vllm-rdna-dash by CrispyGinger (Apache-2.0).
 "use strict";
 
 
@@ -409,3 +408,4 @@ function areaChart(input, opts) {
   box.update(input);
   return box;
 }
+

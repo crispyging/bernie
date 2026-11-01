@@ -97,6 +97,10 @@ type Plan struct {
 	// ContainerHIPDevices are the HIP indices inside the container.
 	ContainerHIPDevices string   `json:"container_hip_devices,omitempty"`
 	Warnings            []string `json:"warnings"`
+	// Adjustments are the changes the plan made so the recipe fits this
+	// host (spec §7.10). An override is never adjusted. Absent when the
+	// plan changed nothing.
+	Adjustments []Adjustment `json:"adjustments,omitempty"`
 	// Compose is the generated docker-compose.yml of the plan. It is set
 	// when the plan is a container plan with an image; host plans leave it
 	// empty. The dashboard renders it in the "Show the exact launch
@@ -150,6 +154,7 @@ func BuildPlan(r *Recipe, o PlanOptions) (*Plan, error) {
 		return nil, err
 	}
 	interp := func(s string) string { return interpolate(s, vals) }
+	adj, warn := fitContext(r, o.Sets, o.GPUs)
 
 	p := &Plan{
 		Recipe:      r.ID,
@@ -163,6 +168,12 @@ func BuildPlan(r *Recipe, o PlanOptions) (*Plan, error) {
 		PathInputs:  []string{},
 		Warnings:    []string{},
 		Restriction: o.Restriction,
+	}
+	if adj != nil {
+		p.Adjustments = append(p.Adjustments, *adj)
+	}
+	if warn != "" {
+		p.Warnings = append(p.Warnings, warn)
 	}
 	if p.Name == "" {
 		p.Name = r.ID

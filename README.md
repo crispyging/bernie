@@ -166,5 +166,5 @@ Apache-2.0. See [LICENSE](LICENSE).
 
 The design of the dashboard and parts of its markup and CSS come from
 [CrispyGinger's vllm-rdna-dash](https://github.com/crispyging/vllm-rdna-dash),
-used with the author's permission. The list of every third-party source is in
+under its Apache-2.0 licence. The list of every third-party source is in
 [docs/third-party.md](docs/third-party.md).

@@ -246,6 +246,8 @@ func Start(ctx context.Context, o Options) (*Handle, error) {
 	h := &Handle{done: make(chan error, 1)}
 	ready := make(chan string, 1)
 	caller := o.Ready
+	// The caller's Ready runs first: Start returns once it is done, so the
+	// URL is printed before the caller goes on.
 	o.Ready = func(url string) {
 		if caller != nil {
 			caller(url)

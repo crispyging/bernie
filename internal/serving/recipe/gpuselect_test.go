@@ -56,7 +56,7 @@ func TestGPUSelectionCapacity(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			r := mkReq("gfx1030", tt.count)
 			r.Requires.VRAMGiB = tt.vram
-			if fit := CheckFit(r, tt.gpus, 0); fit.Status != tt.wantFit {
+			if fit := CheckFit(r, Host{GPUs: tt.gpus}); fit.Status != tt.wantFit {
 				t.Fatalf("fit = %+v, want %s", fit, tt.wantFit)
 			}
 			o := PlanOptions{GPUs: tt.gpus, Topo: tt.tp, Restriction: "restricted host indices"}
@@ -97,7 +97,7 @@ func TestGPUSelectionFullCounts(t *testing.T) {
 			}
 			r := mkReq("gfx1030", count)
 			r.Requires.VRAMGiB = 16
-			if fit := CheckFit(r, gpus, 0); fit.Status != FitYes {
+			if fit := CheckFit(r, Host{GPUs: gpus}); fit.Status != FitYes {
 				t.Fatalf("fit = %+v", fit)
 			}
 			for _, topology := range []*topo.Topology{nil, tp} {

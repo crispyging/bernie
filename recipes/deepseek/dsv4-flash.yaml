@@ -49,6 +49,9 @@ inputs:
 requires:
   gpus: 4
   vram_gib: 28
+  # 4 ranks x 6e9 bytes held 107,892 tokens (see the KV budget above). The
+  # value holds for TP=4; the compressed cache grows slower than context.
+  kv_bytes_per_token: 222444
 
 env:
   VLLM_USE_V2_MODEL_RUNNER: "1"

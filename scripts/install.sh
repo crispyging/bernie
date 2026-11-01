@@ -116,6 +116,15 @@ assume_yes=0
 from_source=0
 
 while [ $# -gt 0 ]; do
+    # A flag that takes a value needs one; set -u would abort on $2.
+    case "$1" in
+        --version|--dir|--listen|--container-dir)
+            if [ $# -lt 2 ]; then
+                printf 'bernie: %s needs a value\n\n' "$1" >&2
+                usage >&2
+                exit 2
+            fi ;;
+    esac
     case "$1" in
         --version) version=$2; shift 2 ;;
         --dir)     bin_dir=$2; shift 2 ;;
@@ -519,7 +528,9 @@ if [ "$start_after" = 1 ]; then
     if [ "$changed" = 1 ] || [ "$prev_version" = "" ]; then
         # A loopback listen is the safe default; warn for any other.
         case "$listen" in
-            127.0.0.1:*|\[::1\]:*|localhost:*)
+            # [::1] is quoted: unquoted it is a bracket class that matches
+            # any address that starts with ':' or '1'.
+            127.0.0.1:*|'[::1]':*|localhost:*)
                 ;;
             *)
                 printf 'bernie: WARNING: %s is a non-loopback address; anyone with the URL can drive this host\n' "$listen"
@@ -527,12 +538,12 @@ if [ "$start_after" = 1 ]; then
                 ;;
         esac
         printf 'bernie: starting dashboard on %s ...\n' "$listen"
-        if "$bin_dir/bernie" dash start --listen "$listen" >/dev/null 2>&1; then
-            :
-        else
+        # rc is read in the || branch: inside `if ! cmd`, $? is the status of
+        # the negation, always 0.
+        "$bin_dir/bernie" dash start --listen "$listen" >/dev/null 2>&1 || {
             rc=$?
             printf "bernie: dash start exited %d; the binary is installed, run \`bernie dash start\` to retry\n" "$rc"
-        fi
+        }
     else
         printf "bernie: version unchanged; dashboard left as-is (run \`bernie dash status\` to verify)\n"
     fi

@@ -273,7 +273,7 @@ async function viewBenchmark(root) {
       benchState.result = pick || null;
       put(resultCard, benchResultBody(pick, pick === list[0] ? headline : null));
       const curve = pick ? curveSmallMultiples(pick.cells) : null;
-      put(curveCard, curve || emptyState("This suite has no ladder.",
+      put(curveCard, curve || emptyState(pick ? "This result has no ladder." : "No curve yet.",
         "Run the long-context suite to see the curve.", "bernie bench --suite long-context"));
       put(historyCard, benchHistory(list, null, (r) => {
         cand.value = r.id;

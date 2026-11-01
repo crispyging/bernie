@@ -1,4 +1,4 @@
-// Raw setup evidence. Adapted from vllm-rdna-dash by CrispyGinger, with permission.
+// Raw setup evidence. Adapted from vllm-rdna-dash by CrispyGinger (Apache-2.0).
 "use strict";
 
 function setupAdvancedPanel() {

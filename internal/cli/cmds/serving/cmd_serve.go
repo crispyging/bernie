@@ -64,6 +64,9 @@ func init() {
 		}
 		p := rec.Plan
 		if p != nil {
+			for _, a := range p.Adjustments {
+				c.Logf("adjusted: %s", a)
+			}
 			for _, w := range p.Warnings {
 				c.Logf("warning: %s", w)
 			}
@@ -196,6 +199,9 @@ func init() {
 		b, err := runner.Compose(p, rows, cfg.ResolveHFHome())
 		if err != nil {
 			return err
+		}
+		for _, a := range p.Adjustments {
+			c.Logf("adjusted: %s", a)
 		}
 		for _, w := range p.Warnings {
 			c.Logf("warning: %s", w)

@@ -355,7 +355,7 @@ func TestCheckFit(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			f := CheckFit(mk(tt.req), tt.gpus, tt.ram)
+			f := CheckFit(mk(tt.req), Host{GPUs: tt.gpus, RAMBytes: tt.ram})
 			if f.Status != tt.status {
 				t.Errorf("status = %s (%v), want %s", f.Status, f.Reasons, tt.status)
 			}
@@ -372,15 +372,15 @@ func TestMultiArchRecipeFitsEachGeneration(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if f := CheckFit(r, gpus, 0); f.Status != FitYes {
+	if f := CheckFit(r, Host{GPUs: gpus}); f.Status != FitYes {
 		t.Errorf("fit = %s %v", f.Status, f.Reasons)
 	}
 	for name, only := range map[string][]gpu.GPU{"rdna2 only": gpus[2:], "rdna3 only": gpus[:2]} {
-		if f := CheckFit(r, only, 0); f.Status != FitYes {
+		if f := CheckFit(r, Host{GPUs: only}); f.Status != FitYes {
 			t.Errorf("%s: fit = %s %v", name, f.Status, f.Reasons)
 		}
 	}
-	if f := CheckFit(r, []gpu.GPU{{HIPIndex: 0, GFX: "gfx1201"}}, 0); f.Status != FitNo {
+	if f := CheckFit(r, Host{GPUs: []gpu.GPU{{HIPIndex: 0, GFX: "gfx1201"}}}); f.Status != FitNo {
 		t.Errorf("gfx1201: fit = %s", f.Status)
 	}
 	// Two W7800 satisfy gpus: 2 even though the recipe lists RDNA2 first.

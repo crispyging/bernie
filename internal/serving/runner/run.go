@@ -55,6 +55,8 @@ type Record struct {
 type Status struct {
 	Record
 	State string `json:"state"`
+	// Waiting says why a starting run is not running yet (spec §8.3).
+	Waiting string `json:"waiting,omitempty"`
 }
 
 // URL is the base URL of the run's server (loopback for wildcard hosts).

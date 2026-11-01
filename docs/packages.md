@@ -16,7 +16,7 @@ Packages are grouped by role: `internal/machine` (what the host is),
 | `internal/cli` | the command framework | `Register`, `Main`, `Command`, `Context`, `ExitError`, `WriteMatches` | 4 |
 | `internal/cli/cmds/health` | `doctor`, `setup`, `status`, `up` | `cli.Register` per command | 4 |
 | `internal/cli/cmds/inventory` | `hw`, `topo` | `cli.Register` per command | 4 |
-| `internal/cli/cmds/serving` | `recipe`, `serve`, `ps`, `stop`, `logs`, `compose`, `config` | `cli.Register` per command | 4 |
+| `internal/cli/cmds/serving` | `recipe`, `serve`, `ps`, `stop`, `logs`, `compose`, `config`, `attach`, `smoke`, `chat`, `connect` | `cli.Register` per command | 4 |
 | `internal/cli/cmds/tunecmd` | `tune` | `cli.Register` per command | 4 |
 | `internal/cli/cmds/benchcmd` | `bench` | `cli.Register` per command | 4 |
 | `internal/cli/cmds/dashcmd` | `dash` | `cli.Register` per command | 4 |
@@ -28,7 +28,7 @@ Packages are grouped by role: `internal/machine` (what the host is),
 | `dashboard/internal/httpjson` | the JSON response shapes and the redaction | `Write`, `Error`, `Decode`, `Redacted` | 4 |
 | `dashboard/internal/sse` | the server-sent event writer | `New`, `Stream`, `LineWriter`, `Heartbeat` | 4 |
 | `dashboard/internal/telemetry` | the 1 Hz sampler and the hub that shares it | `NewHub`, `Hub`, `Sampler` | 4 |
-| `internal/app` | the operations the front ends share | `HW`, `Topo`, `Doctor`, `RecipeList`, `SetupPlan`, `SetupApply`, `SetupRuns`, `SetupRun`, `SetupLatestRun`, `Serve`, `Plan`, `Bench`, `BenchSuite`, `BenchCompare`, `PowerStatus`, `Onboarding`, `RunOnboardingStep`, `Stop`, `Smoke` | 3 |
+| `internal/app` | the operations the front ends share | `HW`, `Topo`, `Doctor`, `RecipeList`, `SetupPlan`, `SetupApply`, `SetupRuns`, `SetupRun`, `SetupLatestRun`, `Serve`, `Plan`, `Bench`, `BenchSuite`, `BenchCompare`, `PowerStatus`, `Onboarding`, `RunOnboardingStep`, `Stop`, `Smoke`, `Chat`, `Connect` | 3 |
 | `internal/flow` | the `status` snapshot and the `up` chain | `Summary`, `Up`, `Findings`, `WaitHealthy`, `Blocked` | 3 |
 | `internal/onboarding` | the onboarding checklist | `Gather`, `Build`, `Load`, `PrepareStep`, `ActionFor`, `StartJob`, `Smoke`, `Document`, `Facts` | 3 |
 | `internal/bench/job` | the benchmark jobs: the store, the state machine and the typed progress events | `NewStore`, `Store`, `Request`, `Doc`, `Job`, `Progress` | 3 |
@@ -43,6 +43,7 @@ Packages are grouped by role: `internal/machine` (what the host is),
 | `internal/serving/vllm/vllmtest` | the deterministic fake vLLM server for tests | `Config`, `Server`, `New`, `CountTokens`, `Prompts`, `ServeHTTP` | 2 |
 | `internal/serving/bench` | the benchmark | `Run`, `Save`, `List`, `Get`, `Options`, `Result` | 2 |
 | `internal/serving/bench/suite` | the bench suites | `Load`, `List`, `Get`, `Run`, `Compare`, `Judge`, `AB` | 2 |
+| `internal/serving/weights` | the model files a server loads, with their hashes | `Of`, `Model`, `File` | 2 |
 | `internal/machine/gpu` | the live GPUs | `List`, `Telemetry`, `TelemetryFast`, `TelemetrySlow`, `MergeSlow`, `Archs`, `ArchMatch`, `ECC` | 1 |
 | `internal/machine/gpu/devices` | the device tables | `Lookup`, `LookupArch`, `CodeTargets`, `GFXName`, `Arch`, `Device` | 1 |
 | `internal/machine/host` | the OS facts | `Probe`, `Preferred`, `InstallCommand`, `GPUGroups`, `Info`, `ProbeCDI`, `SpecStale`, `EngineCDISupport`, `ResolveDeviceAccess` | 1 |
@@ -207,16 +208,21 @@ type Set struct { Recipes map[string]*Recipe; Errors []LoadError }
 func Load(extraDirs ...string) Set                 // layers: embedded, config, $BERNIE_RECIPES, extra
 func (s Set) Resolve(id string) (*Recipe, error)   // extends merged
 func Validate(r *Recipe) []string
-type Fit struct { Status string; Reasons, Modes []string }   // fits|no|unknown
-func CheckFit(r *Recipe, gpus []gpu.GPU, ramBytes uint64) Fit
-func List(s Set, gpus []gpu.GPU, ramBytes uint64, all bool) Listing
-func Best(l Listing) string                        // fit, then priority, then id
+type Fit struct { Status string; Reasons, Modes []string }   // fits|tight|no|unknown
+func (f Fit) Usable() bool                         // fits or tight
+type Host struct { GPUs []gpu.GPU; RAMBytes, DiskFreeBytes uint64; Cached func(model string) bool }
+func CheckFit(r *Recipe, h Host) Fit
+type KV struct { MaxModelLen int; BytesPerToken, NeedBytes, BudgetBytes float64; Source string }
+func CheckKV(r *Recipe, minVRAM uint64) *KV        // nil: no KV data
+func List(s Set, h Host, all bool) Listing
+func Best(l Listing) string                        // fits, then tight, then priority, then id
 func ValidatedArchs(s Set) []string
 type Plan struct { Recipe, Name, Mode, Entrypoint, Model, ServedName, Host string; Port int
-    Env map[string]string; Args []string; Settings []Setting; GPUs []int; HIPDevices, GPUSelectReason string
+    Env map[string]string; Args []string; Settings []Setting; Adjustments []Adjustment; GPUs []int; HIPDevices, GPUSelectReason string
     Image, ShmSize, TunableOpProfile, TunableOpRows string; PathInputs []string
     Mounts []Mount; Warnings []string; Exec *Exec }
 type Setting struct { Setting, Value, Why string }
+type Adjustment struct { Setting, From, To, Reason string }   // Plan.Adjustments
 type PlanOptions struct { Mode, Name string; Sets []string; GPUs []gpu.GPU; Topo *topo.Topology;
     TunedMoE func(gfx string) (string, error) }
 func BuildPlan(r *Recipe, o PlanOptions) (*Plan, error)
@@ -251,7 +257,7 @@ type PrepareOptions struct { Recipe, Mode, Name, Venv, Engine string; Sets []str
 func Prepare(ctx context.Context, o PrepareOptions) (*recipe.Plan, error) // config, recipe, GPUs, plan, host env, TunableOp, exec
 type Record struct { Name, Recipe, Mode string; PID int; Container, Engine, Host string;
     Port int; StartedAt time.Time; Log, Image, ImageDigest string; Plan *recipe.Plan }
-type Status struct { Record; State string }        // running|starting|exited
+type Status struct { Record; State, Waiting string }   // running|starting|exited; Waiting: why starting
 func Start(ctx context.Context, p *recipe.Plan, o StartOptions) (*Record, error)
 func List(ctx context.Context) ([]Status, error)
 func Stop(ctx context.Context, name string) error

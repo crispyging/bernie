@@ -60,3 +60,10 @@ func modelCached(hub, repo string) bool {
 	}
 	return false
 }
+
+// ModelCached reports a complete snapshot of the repo (or an existing local
+// directory) in the Hugging Face cache of hfHome ("" = $HF_HOME, else
+// ~/.cache/huggingface).
+func ModelCached(hfHome, repo string) bool {
+	return modelCached(hubCache(hubHome(hfHome)), repo)
+}

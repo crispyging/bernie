@@ -189,6 +189,7 @@ tuning data.
 | `internal/serving/vllm/` | the client: `/health`, `/v1/models`, `/tokenize`, `/metrics` | 2 |
 | `internal/serving/bench/` | the streaming benchmark and the result store | 2 |
 | `internal/serving/bench/suite/` | the bench suites: the cells, the comparison, the verdict | 2 |
+| `internal/serving/weights/` | the model files a server loads, with their hashes | 2 |
 | `internal/support/*` | the shared helpers: paths, execx, config, redact, pyenv, factcache, fixture | 0 |
 | `dashboard/` | the server, the API, the auth, the SSE, the telemetry, the JSON helpers and the embedded web assets | 4 |
 | `recipes/` | the built-in recipes by family, the fragments by concern | data |
@@ -463,14 +464,14 @@ flowchart LR
 ### 3.3 Life of a run
 
 The state of a run is not stored. `runner.List` derives it from the process
-(or container) and `/health`. Only `run.json` is stored, when `Start`
-succeeds. A plan has no record until it starts.
+(or container), `/health` and one completion. Only `run.json` and the
+`answered` mark of the first completion are stored. A plan has no record until it starts.
 
 ```mermaid
 stateDiagram-v2
   [*] --> planned: Prepare (recipe plan)
   planned --> starting: Start writes run.json
-  starting --> running: /health answers 200
+  starting --> running: /health answers 200 and one completion answers
   running --> starting: process alive, /health silent
   starting --> exited: process or container gone
   running --> exited: bernie stop, or a crash

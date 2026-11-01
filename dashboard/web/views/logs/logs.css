@@ -2,7 +2,7 @@
    tokens of css/tokens.css; this file never writes one. The log surface has
    its own tokens so that it stays near-black in both palettes.
    The near-black log surface and the bar on the left of a finding follow
-   vllm-rdna-dash by CrispyGinger, used with permission. */
+   vllm-rdna-dash by CrispyGinger (Apache-2.0). */
 
 [hidden] { display: none !important; }
 

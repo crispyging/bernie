@@ -1,4 +1,4 @@
-// Setup checklist. Adapted from vllm-rdna-dash by CrispyGinger, with permission.
+// Setup checklist. Adapted from vllm-rdna-dash by CrispyGinger (Apache-2.0).
 "use strict";
 
 const TIMELINE_STATE_WORD = {

@@ -129,6 +129,7 @@ func Run(ctx context.Context, o Options, progress io.Writer) (*Result, error) {
 		Time:        now,
 		Options:     o,
 		Fingerprint: fingerprint(paths.State(), o.URL),
+		Weights:     modelWeights(paths.State(), o.URL),
 		PromptWords: words,
 		Calibrated:  calibrated,
 		Workload: &Workload{

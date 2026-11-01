@@ -1,6 +1,6 @@
 "use strict";
 // Host-wide comparison and one selected-device inspector.
-// Adapted from vllm-rdna-dash by CrispyGinger, used with permission.
+// Adapted from vllm-rdna-dash by CrispyGinger (Apache-2.0).
 
 // Missing measurements stay missing, never zero.
 function dashTile(spec) {
@@ -25,6 +25,7 @@ function dashTile(spec) {
   };
   return el;
 }
+
 
 
 // Keep memory-health warnings visible outside the technical disclosure.

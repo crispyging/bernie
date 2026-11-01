@@ -244,6 +244,7 @@ fi
 printf '  PASS  dry-run --start did not install\n'
 teardown "$t"
 
+
 echo "test 8: unknown flag with --start exits non-zero"
 t=$(setup)
 set +e
@@ -263,6 +264,7 @@ echo $? >"$t/rc"
 set -e
 rc=$(cat "$t/rc")
 assert_equals "--listen missing value exit code" "$rc" "2"
+
 teardown "$t"
 
 echo "test 10: dry-run --container prints the container plan"
@@ -290,6 +292,7 @@ echo $? >"$t/rc"
 set -e
 rc=$(cat "$t/rc")
 assert_equals "--container-dir missing value exit code" "$rc" "2"
+
 teardown "$t"
 
 # --- the source path: no release, and Go to fetch ---------------------------

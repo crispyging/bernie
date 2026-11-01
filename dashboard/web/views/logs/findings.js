@@ -1,8 +1,8 @@
 // The known problems of the log: the findings of the log doctor
 // (design/logs.md). The findings sit above the tail: a reader who opens the
 // tab sees what is wrong before the noise.
-// The shape of a finding card follows vllm-rdna-dash by CrispyGinger, used
-// with permission.
+// The shape of a finding card follows vllm-rdna-dash by CrispyGinger
+// (Apache-2.0).
 "use strict";
 
 /** logPill is a state as an icon and a word. The colour never carries the
@@ -52,7 +52,7 @@ function logFindings(matches, options) {
   if (!list.length) {
     return emptyState("No recognized problems in this log.",
       "This checks known patterns, not overall health. If the server is not working, inspect the log below.",
-      "bernie doctor --run NAME");
+      "bernie doctor --run " + (o.run || "NAME"));
   }
   return h("div.findings", list.map((f) => logFinding(f, o)));
 }

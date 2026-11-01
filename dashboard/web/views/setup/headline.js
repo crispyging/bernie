@@ -1,4 +1,4 @@
-// Setup's one next action. Adapted from vllm-rdna-dash by CrispyGinger, with permission.
+// Setup's one next action. Adapted from vllm-rdna-dash by CrispyGinger (Apache-2.0).
 "use strict";
 
 function setupHeadline(doc) {

@@ -262,3 +262,21 @@ func exists(p string) bool {
 	_, err := os.Stat(p)
 	return err == nil
 }
+
+// FreeBytes is the space free to the user on the file system of path. A
+// path that does not exist yet is measured at its nearest existing parent.
+// 0 means unknown.
+func FreeBytes(path string) uint64 {
+	if path == "" {
+		return 0
+	}
+	for p := filepath.Clean(path); ; p = filepath.Dir(p) {
+		var st syscall.Statfs_t
+		if syscall.Statfs(p, &st) == nil {
+			return uint64(st.Bavail) * uint64(st.Bsize)
+		}
+		if p == filepath.Dir(p) {
+			return 0
+		}
+	}
+}

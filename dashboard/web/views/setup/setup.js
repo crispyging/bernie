@@ -1,6 +1,5 @@
-// Setup view. Adapted from vllm-rdna-dash by CrispyGinger, with permission.
+// Setup view. Adapted from vllm-rdna-dash by CrispyGinger (Apache-2.0).
 "use strict";
-
 const SETUP_EXTRA_STEPS = ["bench", "tuning", "power"];
 const SETUP_SMOKE_ENABLED = true;
 const setupProgress = {};

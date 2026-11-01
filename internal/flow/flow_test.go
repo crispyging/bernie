@@ -11,6 +11,7 @@ import (
 	"github.com/opengfx1030/bernie/internal/doctor"
 	"github.com/opengfx1030/bernie/internal/machine/gpu"
 	"github.com/opengfx1030/bernie/internal/onboarding"
+	"github.com/opengfx1030/bernie/internal/serving/runner"
 )
 
 func TestNextCommand(t *testing.T) {
@@ -18,35 +19,44 @@ func TestNextCommand(t *testing.T) {
 	fail := doctor.Check{ID: "gpu.kfd", Status: doctor.Fail, Title: "/dev/kfd is readable and writable",
 		Fix: "load the amdgpu driver"}
 	warn := doctor.Check{ID: "kernel.iommu", Status: doctor.Warn, Title: "iommu=pt"}
+	waiting := Run{Status: runner.Status{Record: runner.Record{Name: "r1"}, State: runner.StateStarting,
+		Waiting: "the server answers /health but not a completion yet: HTTP 503"}}
 	cases := []struct {
 		name string
 		f    *onboarding.Facts
+		runs []Run
 		want []string
 	}{
-		{"no GPU: look at the driver", &onboarding.Facts{},
+		{"no GPU: look at the driver", &onboarding.Facts{}, nil,
 			[]string{"bernie doctor   # No AMD GPU is visible to bernie."}},
-		{"fitting recipe: up", &onboarding.Facts{GPUs: one, Recipe: "r1", Best: "r1"},
+		{"fitting recipe: up", &onboarding.Facts{GPUs: one, Recipe: "r1", Best: "r1"}, nil,
 			[]string{"bernie up r1"}},
-		{"no fitting recipe", &onboarding.Facts{GPUs: one},
+		{"no fitting recipe", &onboarding.Facts{GPUs: one}, nil,
 			[]string{"bernie recipe list --all   # No recipe fits this host."}},
 		{"failed check goes first", &onboarding.Facts{GPUs: one, Recipe: "r1",
-			Doctor: doctor.Report{Checks: []doctor.Check{warn, fail}}},
+			Doctor: doctor.Report{Checks: []doctor.Check{warn, fail}}}, nil,
 			[]string{"load the amdgpu driver   # This account cannot open the GPU devices."}},
 		{"warnings alone do not add doctor", &onboarding.Facts{GPUs: one, Recipe: "r1",
-			Doctor: doctor.Report{Checks: []doctor.Check{warn}}},
+			Doctor: doctor.Report{Checks: []doctor.Check{warn}}}, nil,
 			[]string{"bernie up r1"}},
 		{"running: dash and bench instead of up", &onboarding.Facts{GPUs: one, Recipe: "r1",
-			Runs: []onboarding.Run{{Name: "r1", State: "running"}}},
+			Runs: []onboarding.Run{{Name: "r1", State: "running"}}}, nil,
 			[]string{"bernie dash", "bernie bench"}},
-		{"starting counts as running", &onboarding.Facts{GPUs: one, Recipe: "r1",
-			Runs: []onboarding.Run{{Name: "r1", State: "starting"}}},
-			[]string{"bernie dash", "bernie bench"}},
+		{"starting: follow the log, do not bench", &onboarding.Facts{GPUs: one, Recipe: "r1",
+			Runs: []onboarding.Run{{Name: "r1", State: "starting"}}}, nil,
+			[]string{"bernie logs -f   # the server is loading the model", "bernie dash"}},
+		{"starting: the log of the run and what it waits for", &onboarding.Facts{GPUs: one, Recipe: "r1",
+			Runs: []onboarding.Run{{Name: "r1", State: "starting"}}}, []Run{waiting},
+			[]string{"bernie logs r1 -f   # r1 is starting: the server answers /health but not a completion yet: HTTP 503", "bernie dash"}},
+		{"loading phase is not ready", &onboarding.Facts{GPUs: one, Recipe: "r1",
+			Runs: []onboarding.Run{{Name: "r1", State: "running", Phase: "Loading the model weights"}}}, nil,
+			[]string{"bernie logs -f   # the server is loading the model", "bernie dash"}},
 		{"exited run is not running", &onboarding.Facts{GPUs: one, Recipe: "r1",
-			Runs: []onboarding.Run{{Name: "r1", State: "exited"}}},
+			Runs: []onboarding.Run{{Name: "r1", State: "exited"}}}, nil,
 			[]string{"bernie up r1"}},
 	}
 	for _, c := range cases {
-		s := &Summary{Onboarding: onboarding.Build(c.f)}
+		s := &Summary{Onboarding: onboarding.Build(c.f), Runs: c.runs}
 		if got := next(s); !reflect.DeepEqual(got, c.want) {
 			t.Errorf("%s: next = %q, want %q", c.name, got, c.want)
 		}

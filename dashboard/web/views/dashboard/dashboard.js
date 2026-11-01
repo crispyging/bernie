@@ -1,6 +1,6 @@
 "use strict";
 // Dashboard uses the shared telemetry stream; it opens no timer or stream.
-// Adapted from vllm-rdna-dash by CrispyGinger, used with permission.
+// Adapted from vllm-rdna-dash by CrispyGinger (Apache-2.0).
 
 const dash = {
   samples: [],   // the compact telemetry ring buffer (one hour of samples)
@@ -114,7 +114,7 @@ function dashRunStatus(run) {
 
 function dashPhase(run) {
   if (!run) return "";
-  return run.phase && run.phase.sentence ? run.phase.sentence : "The server is starting; its health check is not ready yet.";
+  return [run.phase && run.phase.sentence, run.waiting].filter(Boolean).join(" ") || "The server is starting; its health check is not ready yet.";
 }
 
 // Read failures stay visible without blocking the other cards.

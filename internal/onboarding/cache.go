@@ -28,9 +28,12 @@ var gather = Gather
 // seconds, stale says that the document was past its time to live and that
 // a refresh is running.
 func Load(ctx context.Context, o Options) (*Document, error) {
+	// The probe is read once here: the refresh may run in the background
+	// after Load returns, and must not read the package variable then.
+	probe := gather
 	doc, age, stale, err := factcache.Get(ctx, documentKey(o), "", DocumentTTL,
 		func(ctx context.Context) (*Document, error) {
-			f, err := gather(ctx, o)
+			f, err := probe(ctx, o)
 			if err != nil {
 				return nil, err
 			}

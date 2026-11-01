@@ -244,6 +244,10 @@ checklist of [spec §3.3](../docs/spec.md#33-the-onboarding-checklist): every
 step of the path from a bare machine to a serving model, in order, and the
 recipe chooser below it.
 
+Automatic plan adjustments stay visible beside compatibility warnings: the
+setting, old and effective values, and reason appear before launch. Startup
+status on Dashboard and Logs includes the runner's reason for waiting on readiness.
+
 The old links still open their new home: `#overview` and `#home` open Setup,
 `#recipes` opens Setup, `#gpus` opens Dashboard, `#topology` opens the
 Topology tab, `#runs` opens Logs and `#bench` opens Benchmark.

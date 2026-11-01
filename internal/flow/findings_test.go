@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"net"
-	"net/http"
 	"net/http/httptest"
 	"os"
 	"os/exec"
@@ -16,6 +15,7 @@ import (
 	"time"
 
 	"github.com/opengfx1030/bernie/internal/serving/runner"
+	"github.com/opengfx1030/bernie/internal/serving/vllm/vllmtest"
 )
 
 const oomLog = `# bernie 2026-10-28T10:00:00Z: python -m vllm.entrypoints.cli.main serve org/m
@@ -48,7 +48,8 @@ func writeRun(t *testing.T, name, log string, pid, port int) {
 }
 
 // liveVLLM starts a process whose command line names vllm (what the runner
-// checks for) and a /health endpoint on port.
+// checks for) and a fake vLLM server on port: it answers /health and a
+// completion, so the run is running.
 func liveVLLM(t *testing.T) (pid, port int) {
 	t.Helper()
 	cmd := exec.Command("sh", "-c", "sleep 60; :", "vllm")
@@ -56,7 +57,7 @@ func liveVLLM(t *testing.T) (pid, port int) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = cmd.Process.Kill(); _ = cmd.Wait() })
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	srv := httptest.NewServer(vllmtest.New(vllmtest.Config{}))
 	t.Cleanup(srv.Close)
 	_, p, _ := net.SplitHostPort(strings.TrimPrefix(srv.URL, "http://"))
 	port, _ = strconv.Atoi(p)

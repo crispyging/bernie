@@ -1,5 +1,5 @@
 /* Dashboard shell: side rail on desktop, bottom navigation on mobile.
-   Adapted from vllm-rdna-dash by CrispyGinger, used with permission. */
+   Adapted from vllm-rdna-dash by CrispyGinger (Apache-2.0). */
 
 body.shell {
   display: grid;

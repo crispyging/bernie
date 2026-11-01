@@ -1,4 +1,4 @@
-// Recipe selection and preview. Adapted from vllm-rdna-dash by CrispyGinger, with permission.
+// Recipe selection and preview. Adapted from vllm-rdna-dash by CrispyGinger (Apache-2.0).
 "use strict";
 
 async function loadSetupRecipes(gen = setupState.generation) {
@@ -32,12 +32,12 @@ async function loadSetupRecipes(gen = setupState.generation) {
   await loadSetupPlan();
 }
 
+
 function setupRecipeOrder(recipes) {
   const rank = (r) => {
     const fit = setupFitStatus(r);
-    if (fit === "fits") return 0;
-    if (fit === "unknown") return 1;
-    return 2;
+    const i = ["fits", "tight", "unknown"].indexOf(fit);
+    return i < 0 ? 3 : i;
   };
   return recipes.slice().sort((a, b) => {
     const d = rank(a) - rank(b);
@@ -85,6 +85,7 @@ function setupRecommendedRecipe(recipes) {
   }
   return list.find((r) => setupFitStatus(r) === "fits") || null;
 }
+
 function setupFitStatus(recipe) {
   return recipe && recipe.fit && recipe.fit.status || "unknown";
 }
@@ -93,6 +94,7 @@ function setupFitLine(recipe) {
   const reasons = recipe && recipe.fit && recipe.fit.reasons || [];
   if (status === "unknown") return "Compatibility has not been confirmed." + (reasons.length ? " " + reasons.join("; ") : "");
   if (status === "no") return "Not compatible: " + (reasons.join("; ") || "this recipe does not fit this host.");
+  if (status === "tight") return "Fits with reduced context." + (reasons.length ? " " + reasons.join("; ") : "");
   return "Compatible with this host." + (reasons.length ? " " + reasons.join("; ") : "");
 }
 async function loadSetupPlan() {
@@ -170,6 +172,7 @@ function setupPlanView(plan, recipe, local) {
     Object.values(setupProgress).some((s) => s.running) ? h("p.small.muted", "Changes here apply to the next run, not the job already running.") : null,
     setupFitStatus(recipe) !== "fits" ? h("p.recipe-warning", setupFitLine(recipe)) : null,
     (plan.warnings || []).map((w) => h("p.recipe-warning", w)),
+    setupPlanAdjustments(plan),
     setupPlanOverrides(recipe), setupPlanAdjust(plan), setupPlanLaunchBox(plan, local));
 }
 
@@ -183,6 +186,7 @@ function setupPlanLaunchBox(plan, local) {
   }).catch((e) => put(box, failed(e)));
   return box;
 }
+
 function setupPlanCommand(plan) {
   if (plan.command) return plan.command;
   const exec = plan.exec || {};
@@ -208,15 +212,11 @@ function setupPlanAdjustments(plan) {
   if (!adjustments.length) return null;
   return h("div.recipe-adjustments",
     h("h4", "What the plan changed"),
-    adjustments.map((a) => {
-      if (typeof a === "string") return h("div.recipe-adjustment", a);
-      const what = a.what || a.setting || a.path || "";
-      return h("div.recipe-adjustment",
-        h("span.recipe-adjustment-what", what),
-        a.why ? h("span.recipe-adjustment-why", a.why) : null);
-    }));
+    adjustments.map((a) => h("div.recipe-adjustment",
+      h("span.recipe-adjustment-what", a.setting + ": " + a.from + " → " + a.to),
+      h("span.recipe-adjustment-why", a.reason))));
 }
-/** Required recipe inputs stay visible; optional overrides do not dominate setup. */
+// Required inputs stay visible; optional overrides fold away.
 function setupPlanOverrides(recipe) {
   if (!recipe) return null;
   const inputs = recipe.inputs || {};
@@ -294,7 +294,7 @@ function setupPlanAdjust(plan) {
     h("div.recipe-gpus", h("span.recipe-gpus-label", "GPUs"),
       h("span.recipe-gpus-value", (plan.gpus || []).length ? plan.gpus.join(", ") : "not reported"),
       plan.gpu_select_reason ? h("span.recipe-gpus-why", plan.gpu_select_reason) : null),
-    setupPlanSettings(plan), setupPlanAdjustments(plan));
+    setupPlanSettings(plan));
   let loaded = false;
   panel.addEventListener("toggle", async () => {
     if (!panel.open || loaded) return;
@@ -348,8 +348,7 @@ function paintSetupRecipeHint() {
     put(box);
     return;
   }
-  const fits = list.filter((r) => setupFitStatus(r) === "fits");
-  if (fits.length) {
+  if (list.some((r) => ["fits", "tight"].includes(setupFitStatus(r)))) {
     put(box);
     return;
   }

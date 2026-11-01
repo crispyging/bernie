@@ -51,7 +51,11 @@ func TestServicePathsAreUnderState(t *testing.T) {
 	if !strings.HasPrefix(p.Startup, p.State) {
 		t.Errorf("startup %q not under state dir %q", p.Startup, p.State)
 	}
-	// Default state dir is under HOME, never /tmp.
+	// Default state dir is under HOME, never /tmp. Clear the overrides so
+	// the default is what resolves.
+	t.Setenv("BERNIE_STATE_DIR", "")
+	t.Setenv("XDG_STATE_HOME", "")
+	t.Setenv("HOME", "/home/bernie-test")
 	def := ServicePaths()
 	if strings.Contains(def.State, "/tmp/") {
 		t.Errorf("default state dir %q must not be under /tmp", def.State)

@@ -30,14 +30,23 @@ func List(ctx context.Context) ([]Status, error) {
 		if err != nil {
 			continue
 		}
-		out = append(out, Status{Record: *r, State: state(ctx, r)})
+		st, why := liveState(ctx, r)
+		out = append(out, Status{Record: *r, State: st, Waiting: why})
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].StartedAt.Before(out[j].StartedAt) })
 	return out, nil
 }
 
-// state is running (/health answers), starting (alive, not healthy) or exited.
+// state is the state of the run alone (see liveState).
 func state(ctx context.Context, r *Record) string {
+	st, _ := liveState(ctx, r)
+	return st
+}
+
+// liveState is running (/health answers and the server answered a one-token
+// completion), starting (alive, not yet both) or exited. For a starting
+// run, the second result says what the run waits for (spec §8.3).
+func liveState(ctx context.Context, r *Record) (string, string) {
 	alive := false
 	switch {
 	case r.Foreign:
@@ -51,12 +60,15 @@ func state(ctx context.Context, r *Record) string {
 		alive = processAlive(r.PID)
 	}
 	if !alive {
-		return StateExited
+		return StateExited, ""
 	}
-	if healthy(ctx, r.URL()) {
-		return StateRunning
+	if !healthy(ctx, r.URL()) {
+		return StateStarting, "the server does not answer /health yet"
 	}
-	return StateStarting
+	if err := answered(ctx, r); err != nil {
+		return StateStarting, "the server answers /health but not a completion yet: " + err.Error()
+	}
+	return StateRunning, ""
 }
 
 func healthy(ctx context.Context, base string) bool {

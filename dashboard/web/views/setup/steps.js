@@ -1,6 +1,6 @@
 // The actions of the steps of the checklist: start a step, follow the job
 // it starts and show the progress under the step.
-// Adapted from vllm-rdna-dash by CrispyGinger, used with permission.
+// Adapted from vllm-rdna-dash by CrispyGinger (Apache-2.0).
 "use strict";
 
 async function runSetupStep(step, options = {}) {

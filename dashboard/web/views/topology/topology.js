@@ -1,6 +1,6 @@
 "use strict";
 // GPU connections: readiness first, measured speed second, physical wiring on demand.
-// Adapted from vllm-rdna-dash by CrispyGinger, used with permission.
+// Adapted from vllm-rdna-dash by CrispyGinger (Apache-2.0).
 const topo = {
   data: null,   // GET /api/topo
   check: null,  // GET /api/topo/check
