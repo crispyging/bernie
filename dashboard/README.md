@@ -74,7 +74,7 @@ the readiness callback.
 | `web/js/data.js` | The only place that fetches: `api()`, `apiText()`, the shared state, the SSE streams and the one poller |
 | `web/js/boot.js` | The router, the old-hash aliases, the keyboard shortcuts and the manifest of the files of a tab. Loaded last. |
 | `web/components/` | The shared widgets: cards, command block, charts, metrics, comparison, step timeline |
-| `web/views/<tab>/` | One file per concern of a tab: `viewSetup`, `viewDashboard`, `viewChat`, `viewBenchmark`, `viewTopology`, `viewFleet`, `viewLogs`, `viewAdvanced` |
+| `web/views/<tab>/` | One file per concern of a tab: `viewSetup`, `viewDashboard`, `viewChat`, `viewBenchmark`, `viewQuality`, `viewTopology`, `viewFleet`, `viewLogs`, `viewAdvanced` |
 | `web/views/topology/topology.css` | The Topology tab only: the matrix, the legend, the tree and the checklist |
 | `web/views/chat/chat.css` | The Chat tab only: the prompt box, the answer and the numbers of the answer |
 | `web/views/fleet/fleet.css` | The Fleet tab only: the rows of the other hosts and the form that adds one |
@@ -119,6 +119,7 @@ Regenerate the table rows with `scripts/check-web.sh --print-globals`.
 | `dashboard/web/views/advanced/power.js` | `advPowerCard`, `advPaintPower`, `advPowerRow`, `advSavePower` |
 | `dashboard/web/views/benchmark/benchmark.js` | `benchState`, `benchSection`, `benchFailed`, `benchResults`, `benchSuiteLine`, `benchHeadline`, `benchCopy`, `benchReceipt`, `benchStartError`, `cancelBench`, `deleteBenchResult`, `viewBenchmark` |
 | `dashboard/web/views/benchmark/report.js` | `benchCtx`, `benchCtxName`, `benchRefName`, `benchKpis`, `benchAggPrefill`, `BENCH_CHARTS`, `benchGrid`, `benchChart`, `benchCharts`, `benchCellState`, `benchServer`, `BENCH_COLS`, `benchRow`, `benchMatrix`, `benchReport` |
+| `dashboard/web/views/quality/quality.js` | `qPct`, `qBuckets`, `qFacts`, `qWhy`, `qCase`, `qModel`, `viewQuality` |
 | `dashboard/web/views/benchmark/suites.js` | `benchSuiteCells`, `benchSuiteEstS`, `benchMinutes`, `benchSuiteCard`, `benchSuiteCards`, `benchSentence`, `benchProgress`, `benchBest`, `benchSuiteOf`, `benchHistoryRow`, `benchHistory`, `benchAB`, `benchAdvanced` |
 | `dashboard/web/views/chat/chat.js` | `chatState`, `viewChat` |
 | `dashboard/web/views/dashboard/dashboard.js` | `dash`, `dashGroup`, `dashAgg`, `dashPickRun`, `dashSection`, `dashInfo`, `dashPush`, `dashSeries`, `dashLiveRun`, `dashRunStatus`, `dashPhase`, `dashLoad`, `dashUpdateSimple`, `dashHistory`, `dashWindowSeries`, `viewDashboard`, `dashSample` |
@@ -202,7 +203,7 @@ number.
 5. Show the unit and the range of every number. Show `–` when a number is
    missing.
 
-## The eight tabs
+## The nine tabs
 
 Each tab answers one question. Keep it that way.
 
@@ -211,7 +212,8 @@ Each tab answers one question. Keep it that way.
 | Setup | Is this host ready, what do I do next, and what can it serve? | `/api/onboarding`, `/api/hw`, `/api/doctor`, `/api/recipes`, `.../plan` | run a step, start a run |
 | Dashboard | Is it serving, how fast is it, and how does an app connect? | `/api/telemetry`, `/api/hw`, `/api/runs`, `/api/glossary`, `/api/gpus/history` | copy the URL, stop the run, copy a curl or Python request |
 | Chat | What will I ask the model? | `/api/chat`, `/api/runs` | send one prompt, stop the answer |
-| Benchmark | How fast is it, and does it read the whole prompt? | `/api/bench`, `/api/bench/suites`, `.../compare` | start a bench, compare two results |
+| Benchmark | How fast is it, and does it read the whole prompt? | `/api/bench`, `/api/bench/suites`, `.../compare`, `/api/bench/csv` | start a bench, compare two results, download a result as CSV |
+| Quality | Does it answer right, and why did a case fail? | `/api/eval`, `/api/eval/{id}` | pick a saved eval, open the cause of a case, download the cases as CSV |
 | Topology | Can the cards copy to each other? | `/api/topo`, `/api/topo/check` | check the readiness again |
 | Fleet | What do the other hosts do? | `/api/fleet`, `/api/report` | add a host, forget a host, copy the redacted report, open that host's own dashboard |
 | Logs | What is running, and why did it fail? | `/api/runs` (state, phase sentence), `.../logs` | stop, read logs, read the findings |
@@ -313,7 +315,7 @@ blocking checks first. These labels retain the `#topology` and `#advanced`
 routes and their section links. Both tabs remain reachable in either mode.
 
 Headlines use non-italic Inter at 28–42 px; body text is 16 px and secondary
-text 14 px. Mobile keeps the mode controls and all eight tabs reachable.
+text 14 px. Mobile keeps the mode controls and all nine tabs reachable.
 
 A step that bernie can do has a Run button. The step runs in the background
 and its output goes under the step. A step that needs root has the command
@@ -458,4 +460,4 @@ and in [../docs/design-dashboard.md §8.3](../docs/design-dashboard.md#83-perfor
 | No log-error help in the Logs tab | Show the matched rule (id, cause, fix) from the log doctor |
 | No demo mode | Serve a fixture host so people can try the UI without GPUs |
 | Mobile layout is basic | Check each tab at 390 px wide |
-| No screenshot tests | Add a headless-browser smoke test for the eight tabs |
+| No screenshot tests | Add a headless-browser smoke test for the nine tabs |

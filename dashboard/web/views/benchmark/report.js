@@ -199,7 +199,8 @@ function benchMatrix(r) {
 function benchReport(r) {
   if (!r) return emptyState("No result yet.", "Run a suite above and its numbers show here.", "bernie bench --suite smoke");
   return h("div",
-    h("p.bench-result-title", "Result " + r.id + (r.model ? " · " + r.model : "")),
+    h("p.bench-result-title", "Result " + r.id + (r.model ? " · " + r.model : "") + " ",
+      h("a.small", { href: "/api/bench/csv?id=" + encodeURIComponent(r.id), download: "" }, "Download CSV")),
     h("p.small.muted", benchSuiteLine(r)),
     benchKpis(r),
     benchCharts(r),

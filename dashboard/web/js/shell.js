@@ -145,6 +145,7 @@ const SHORTCUTS = [
   ["g then s", "the Setup tab"],
   ["g then d", "the Dashboard tab"],
   ["g then b", "the Benchmark tab"],
+  ["g then q", "the Quality tab"],
   ["g then t", "the GPU links tab"],
   ["g then l", "the Logs tab"],
   ["g then c", "the Tools tab"],

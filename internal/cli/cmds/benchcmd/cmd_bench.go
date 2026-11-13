@@ -34,17 +34,26 @@ func init() {
 		return c.Emit(rs, func(w io.Writer) { printBenchList(w, rs) })
 	}
 
-	show := &cli.Command{Name: "show", Summary: "Show a saved bench result", Usage: "<id>"}
+	show := &cli.Command{Name: "show", Summary: "Show a saved bench result", Usage: "<id> [--csv]"}
 	show.Run = func(c *cli.Context, args []string) error {
-		pos, err := cli.Parse(c.Flags(show), args)
+		fs := c.Flags(show)
+		asCSV := fs.Bool("csv", false, "print the cells as CSV, one row per cell")
+		pos, err := cli.Parse(fs, args)
 		if err != nil {
 			return err
 		}
 		if len(pos) != 1 {
 			return cli.Usagef("bench show needs exactly one result id")
 		}
+		if *asCSV && c.JSON {
+			return cli.Usagef("--csv and --json are two formats; pick one")
+		}
 		r, err := bench.Get(pos[0])
 		if err != nil {
+			return err
+		}
+		if *asCSV {
+			_, err = c.Out.Write(bench.CSV(r))
 			return err
 		}
 		return c.Emit(r, func(w io.Writer) { printBenchResult(w, r) })

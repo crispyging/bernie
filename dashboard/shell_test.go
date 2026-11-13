@@ -8,8 +8,8 @@ import (
 )
 
 // tabOrder is the order of the rail: Setup, Dashboard, Chat, Benchmark,
-// Topology, Fleet, Logs and Advanced.
-var tabOrder = []string{"setup", "dashboard", "chat", "benchmark", "topology", "fleet", "logs", "advanced"}
+// Quality, Topology, Fleet, Logs and Advanced.
+var tabOrder = []string{"setup", "dashboard", "chat", "benchmark", "quality", "topology", "fleet", "logs", "advanced"}
 
 // tabFiles are the files the manifest of js/boot.js names for the tabs that
 // are not the first paint.
@@ -17,6 +17,7 @@ var tabFiles = []string{
 	"views/chat/chat.js",
 	"views/chat/chat.css",
 	"views/fleet/fleet.js",
+	"views/quality/quality.js",
 	"views/topology/topology.js",
 	"views/topology/matrix.js",
 	"views/topology/links.js",
@@ -25,9 +26,9 @@ var tabFiles = []string{
 	"views/topology/topology.css",
 }
 
-// The rail holds the eight tabs in the order of the design, and the page
+// The rail holds the nine tabs in the order of the design, and the page
 // holds one panel for each of them.
-func TestTheRailHoldsTheEightTabs(t *testing.T) {
+func TestTheRailHoldsTheNineTabs(t *testing.T) {
 	h := newServer(Options{Listen: "127.0.0.1:7860"}).handler()
 	w := do(t, h, "GET", "/", map[string]string{"Host": "127.0.0.1:7860"})
 	if w.Code != http.StatusOK {
@@ -84,12 +85,12 @@ func TestEveryRailTabHasItsContract(t *testing.T) {
 	}
 	views := map[string]string{
 		"setup": "viewSetup", "dashboard": "viewDashboard", "chat": "viewChat",
-		"benchmark": "viewBenchmark", "topology": "viewTopology", "fleet": "viewFleet",
+		"benchmark": "viewBenchmark", "quality": "viewQuality", "topology": "viewTopology", "fleet": "viewFleet",
 		"logs": "viewLogs", "advanced": "viewAdvanced",
 	}
 	labels := map[string]string{
 		"setup": "Setup", "dashboard": "Dashboard", "chat": "Chat",
-		"benchmark": "Benchmark", "topology": "Topology", "fleet": "Fleet",
+		"benchmark": "Benchmark", "quality": "Quality", "topology": "Topology", "fleet": "Fleet",
 		"logs": "Logs", "advanced": "Advanced",
 	}
 	for _, tab := range tabOrder {

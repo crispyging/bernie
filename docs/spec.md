@@ -288,11 +288,11 @@ other file, script or compose file is required.
 | `bernie tune power service remove-plan` | no* | Print the root commands that remove the unit pair. |
 | `bernie bench [--url U] [flags]` | no | Benchmark a server. Save the result. With no arguments it runs the benchmark with the default flags; it never prints help. |
 | `bernie bench suites` | no | The built-in suites with their digest and their groups. |
-| `bernie bench list` / `bench show <ID>` | no | Saved results. |
+| `bernie bench list` / `bench show <ID> [--csv]` | no | Saved results. `--csv` prints the cells of a result as CSV ([§10.1](#101-what-the-numbers-mean)). |
 | `bernie bench compare <ID-A> <ID-B> [--band P] [--markdown]` | no | Two results side by side with a verdict. Refuses two different workloads. `--markdown` prints the receipt of the comparison as markdown. |
 | `bernie bench ab --base ARM --cand ARM` | yes (it starts and stops a server for every arm) | Run a baseline and a candidate in the order base, cand, cand, base and tell the verdict. |
 | `bernie bench eval [--url U] [--kind K] [--model M,...] [--suite S] [--context N,...] [--tracks T,...] [--seed N] [--repeats N]` | no | Grade the answers of a server on seeded technical-workflow cases. Save the result ([§10.5](#105-quality-evaluation)). |
-| `bernie bench eval list` / `eval show <ID>` / `eval tracks` | no | Saved eval results; the suites and the tracks. |
+| `bernie bench eval list` / `eval show <ID> [--csv]` / `eval tracks` | no | Saved eval results; the suites and the tracks. `--csv` prints the cases of a result as CSV ([§10.5](#105-quality-evaluation)). |
 | `bernie bench eval propose --goal TEXT [--url U] [--kind K] [--model M]` | no | Ask the local model to suggest an eval run for a goal; print the checked run and its command. Starts nothing ([§10.5](#105-quality-evaluation)). |
 | `bernie config show` / `config set <KEY> <VALUE>` | yes (config file) | User defaults. |
 | `bernie fleet add <NAME> <URL> [--token T]` / `fleet rm <NAME>` / `fleet ls` | yes (config file) | List of other bernie hosts the Fleet tab watches. The token is stored in the config file with `0600`; it is never sent to the browser ([§11](#11-dashboard)). |
@@ -1784,6 +1784,14 @@ The `protocol_id` names the shape of the measurement. It is
 (`bernie-bench-1`) still loads: its millisecond fields become the new
 distributions, and what it did not measure shows as `–`.
 
+`bernie bench show ID --csv` prints the result as CSV, BroodBench's run
+export: one row per cell with the group, the lens, the counts, the skip
+reason, the output, prefill, decode, TTFT and ITL numbers, the probe and the
+server's counters, the mean token counts and the error samples. A number
+that was not measured is empty. A text that a spreadsheet would read as a
+formula (it starts with `=`, `+`, `-`, `@`, a tab or a carriage return and
+is not a number) is quoted with a leading `'`.
+
 `bernie bench compare <id-a> <id-b>` puts two results side by side. It
 refuses (exit 1, "workload differs") when the workloads differ: the
 numbers of two different workloads cannot be compared. Two results of
@@ -2089,8 +2097,10 @@ The run:
 The result is `<state>/bench/eval/<id>.json`: the options, the status
 (`done` or `cancelled`), one `summary` per model and one entry per case.
 Accuracy is passed ÷ graded: a skipped case is not graded, an error counts
-as not passed. The summary splits it by track and by context size and
-counts critical cases and loops. A case keeps its question, the reply, the
+as not passed. The summary splits it by track and by context size
+(`by_track` and `by_context`: `name`, `passed`, `graded`, `accuracy`; the
+field is `name`, not `key`, because the dashboard redacts every field named
+like a secret) and counts critical cases and loops. A case keeps its question, the reply, the
 expected value, the tool events and the grader details. The full prompt is
 not saved: the seed, the suite and the context size give it back, less the
 distractor records `context_admission` says were removed.
@@ -2142,6 +2152,12 @@ the grader comparison. The summary of a model counts the categories and the scen
 families of the cases that did not pass in `failure_categories` and
 `failure_families`, and the text output prints the title of the diagnosis
 next to every case that did not pass.
+
+`bernie bench eval show ID --csv` prints one row per case, model and
+repeat: the case, its track, family, variant, context and repeat, the
+status, the diagnosis category, the critical and loop marks, the latency,
+the tokens, the distractor records admission removed, the tool calls, the
+expected value, the reply and the error, with the formula quoting of §10.1.
 
 `bernie bench eval propose --goal TEXT` is BroodBench's advisor. It asks
 the model under test to suggest an eval run for a goal in words, checks the
@@ -2304,12 +2320,17 @@ Rules for responses and tokens:
   `GET /api/telemetry`, `GET /api/power`, `PUT /api/power`, `GET /api/bench`,
   `GET /api/bench/suites`, `GET /api/bench/compare`, `POST /api/bench`,
   `POST /api/bench/run`, `POST /api/bench/ab`, `GET /api/bench/{id}`,
+  `GET /api/bench/csv`, `GET /api/eval`, `GET /api/eval/{id}`,
   `GET /api/jobs` and `POST /api/jobs/{id}/stop` — so there is no secret in
   them for the rule to remove. They go through the same rule all the same, so
   a route that is added later cannot forget it.
 
-The page has eight tabs: Setup, Dashboard, Chat, Benchmark, Topology, Fleet,
-Logs and Advanced. The theme of the page is the choice of the reader and
+The page has nine tabs: Setup, Dashboard, Chat, Benchmark, Quality,
+Topology, Fleet, Logs and Advanced. The Quality tab reads the saved results
+of `bernie bench eval` (`/api/eval`): the score of every model, by track and
+by context, the causes of the cases that did not pass, every case with a
+`Why` button that opens its diagnosis, and a link that downloads the cases
+as CSV. It starts no eval: its empty state shows the command. The theme of the page is the choice of the reader and
 lives in the browser, not in the API: the rail holds the three choices in
 words, `Auto` (the default: the page follows the system and follows it
 live), `Dark` and `Light`; the choice is kept in `localStorage`
@@ -2381,6 +2402,9 @@ The sparklines of the last minute keep every sample.
 | GET | `/api/bench/{id}` | the state of a benchmark run: `{"id", "status", "phase", "event", "done", "total", "result_id"}`. `status` is `running`, `done` or `failed`; `phase` names the cell the run is on; `done` counts the finished cells, `total` is the number of cells of the run and `result_id` is the id of the saved result. `event` is the typed event of the run (below). |
 | GET | `/api/bench/{id}/events` | Server-sent events of a benchmark run: one `log` event per progress line, a `progress` event with the job document, then a `done` or `failed` event with the job document. The document carries the typed event of the run, so the page reads the state of the run and not the text of the log. |
 | GET | `/api/bench/compare?a=ID&b=ID&format=markdown` | the receipt of the comparison as `text/markdown`: the text of `bernie bench compare A B --markdown`. |
+| GET | `/api/bench/csv?id=ID` | `bench show ID --csv` as a `text/csv` download named `ID.csv`. 404 for an unknown result. |
+| GET | `/api/eval` | `bench eval list` JSON: the saved eval results, without their cases. |
+| GET | `/api/eval/{id}` | `bench eval show ID` JSON. With `format=csv`, `bench eval show ID --csv` as a `text/csv` download named `ID.csv`. 404 for an unknown result. |
 | GET | `/api/onboarding` | the onboarding checklist of this host ([§3.3](#33-the-onboarding-checklist)). The document comes from the cache when it is younger than 15 s; an older one is served with `stale` and refreshed in the background. |
 | GET | `/api/setup/runs` | the records of the setup runs of this host, newest first, and the newest one in full ([§6.4](#64-the-run-record)). The answer is `{"runs": [Run], "run": Run}`. |
 | GET | `/api/setup/runs/{id}/log/{step}` | the log of one step of a run: `{"run": "", "step": "", "lines": [""], "truncated": false}`. The tail of the log, at most 400 lines. |

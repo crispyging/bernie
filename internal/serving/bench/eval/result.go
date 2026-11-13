@@ -32,7 +32,7 @@ type Result struct {
 
 // Bucket counts the cases of one track or one context size.
 type Bucket struct {
-	Key      string  `json:"key"`
+	Key      string  `json:"name"` // the track or the context; not "key", which the dashboard redacts
 	Passed   int     `json:"passed"`
 	Graded   int     `json:"graded"`
 	Accuracy float64 `json:"accuracy"`
