@@ -8,7 +8,9 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/opengfx1030/bernie/internal/app"
 	"github.com/opengfx1030/bernie/internal/bench/job"
 	"github.com/opengfx1030/bernie/internal/serving/bench"
 )
@@ -16,6 +18,14 @@ import (
 // benchHandler returns the API routes with a state directory of its own.
 func benchHandler(t *testing.T) http.Handler {
 	t.Helper()
+	// The job of an earlier test may still hold the benchmark lock of the
+	// process; a job started now would end at once as busy.
+	for deadline := time.Now().Add(10 * time.Second); app.BenchRunning(); {
+		if time.Now().After(deadline) {
+			t.Fatal("the benchmark of an earlier test still runs")
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
 	t.Setenv("BERNIE_STATE_DIR", t.TempDir())
 	mux := http.NewServeMux()
 	Register(mux, Options{})

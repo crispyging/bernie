@@ -26,6 +26,15 @@ var ErrBenchBusy = errors.New("a benchmark is already running")
 
 var benchMu sync.Mutex // one benchmark at a time per process
 
+// BenchRunning reports whether a benchmark of this process runs now.
+func BenchRunning() bool {
+	if !benchMu.TryLock() {
+		return true
+	}
+	benchMu.Unlock()
+	return false
+}
+
 // Bench runs a benchmark and saves the result under <state>/bench. Progress
 // lines go to progress. It returns the result and the file it was saved to.
 // When no request succeeded it saves nothing and returns the result with
