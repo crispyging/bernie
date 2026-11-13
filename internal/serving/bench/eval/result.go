@@ -64,6 +64,12 @@ type ModelSummary struct {
 	// AgentEfficiency is the tool-call efficiency of the agent cases;
 	// null when no agent case recorded it.
 	AgentEfficiency *AgentEfficiency `json:"agent_efficiency"`
+	// ByFamilyContext and ByFamily are the outcomes of the graded cases by
+	// family and context and by family; SpeedByContext is the telemetry
+	// of the calls by context. They feed the compare page.
+	ByFamilyContext []Joint        `json:"by_family_context"`
+	ByFamily        []Joint        `json:"by_family"`
+	SpeedByContext  []ContextSpeed `json:"speed_by_context"`
 }
 
 func newResult(o Options, base string) *Result {
@@ -96,6 +102,7 @@ func (r *Result) finish() {
 			calls = append(calls, c.Calls...)
 		}
 		s.Performance, s.AgentEfficiency = aggregate(calls), agentEfficiency(mine)
+		s.ByFamilyContext, s.ByFamily, s.SpeedByContext = joints(mine)
 		tracks, sizes := map[string]*Bucket{}, map[string]*Bucket{}
 		tokens, tokensKnown, latency := 0, true, 0.0
 		for _, c := range r.Cases {

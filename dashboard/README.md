@@ -105,7 +105,7 @@ Regenerate the table rows with `scripts/check-web.sh --print-globals`.
 | `dashboard/web/components/gputable.js` | `gpuValueTable` |
 | `dashboard/web/components/metrics.js` | `METRIC_HELP`, `VERDICTS`, `COMPARE_METRICS`, `benchNum`, `benchDigits`, `SPREAD_STEADY`, `cellFlags`, `verdictChip` |
 | `dashboard/web/components/timeline.js` | `TIMELINE_STATE_WORD`, `TIMELINE_MARK`, `TIMELINE_PILL`, `stepTimeline`, `stepCurrentID`, `stepRow`, `stepPill`, `stepMark`, `stepSummary`, `stepActionLabel`, `stepAction`, `stepProgressNode`, `stepBar`, `stepProblem`, `stepToggleLog` |
-| `dashboard/web/js/boot.js` | `VIEWS`, `OLD_ROUTES`, `TAB_SCRIPTS`, `TAB_CSS`, `tabReady`, `tabLoading`, `loadScript`, `loadStyle`, `openTab`, `parseHash`, `route`, `preparePanel`, `focusSection`, `tabsKey`, `pendingG`, `shortcutsKey`, `boot` |
+| `dashboard/web/js/boot.js` | `VIEWS`, `OLD_ROUTES`, `TAB_SCRIPTS`, `TAB_CSS`, `tabReady`, `tabLoading`, `loadedScripts`, `loadScript`, `loadStyle`, `openTab`, `parseHash`, `route`, `preparePanel`, `focusSection`, `tabsKey`, `pendingG`, `shortcutsKey`, `boot` |
 | `dashboard/web/js/core.js` | `h`, `add`, `put`, `$`, `GiB`, `bytes`, `num`, `ago`, `badge`, `sh`, `SVG_NS`, `chartSvg` |
 | `dashboard/web/js/data.js` | `HISTORY`, `RUN_POLL_MS`, `MAX_POLL_MS`, `STALE_MS`, `state`, `request`, `api`, `loadHW`, `runsOf`, `runURL`, `pushHist`, `slowAgeNote`, `openTelemetry`, `openRunLogs`, `openJobEvents`, `openBenchEvents`, `JOB_POLL_MS`, `watchBenchJob`, `apiText`, `frameJobs`, `frameHandle`, `frameFallback`, `FRAME_FALLBACK_MS`, `runFrameJobs`, `onFrame`, `frameSubs`, `onTabFrame`, `telemetryStream`, `pollTimer`, `pollDelay`, `pollCycle`, `presentTelemetry`, `setLivePaused`, `startTelemetry`, `pollRuns`, `pollCounts`, `schedulePoll`, `startPolling`, `refreshHost` |
 | `dashboard/web/js/shell.js` | `ADVANCED_KEY`, `toastTimer`, `toast`, `copyText`, `copy`, `copySource`, `tipPanel`, `openTip`, `tooltip`, `closeTip`, `setTabCount`, `SHORTCUT_KEY`, `SHORTCUTS`, `shortcutsOn`, `setShortcuts`, `shortcutsText`, `advancedOn`, `applyAdvanced`, `toggleAdvanced`, `setRunPill`, `setPillAge`, `phaseSentence`, `demoBanner` |
@@ -119,7 +119,7 @@ Regenerate the table rows with `scripts/check-web.sh --print-globals`.
 | `dashboard/web/views/advanced/power.js` | `advPowerCard`, `advPaintPower`, `advPowerRow`, `advSavePower` |
 | `dashboard/web/views/benchmark/benchmark.js` | `benchState`, `benchSection`, `benchFailed`, `benchResults`, `benchSuiteLine`, `benchHeadline`, `benchCopy`, `benchReceipt`, `benchStartError`, `cancelBench`, `deleteBenchResult`, `viewBenchmark` |
 | `dashboard/web/views/benchmark/report.js` | `benchCtx`, `benchCtxName`, `benchRefName`, `benchKpis`, `benchAggPrefill`, `BENCH_CHARTS`, `benchGrid`, `benchChart`, `benchCharts`, `benchCellState`, `benchServer`, `BENCH_COLS`, `benchRow`, `benchMatrix`, `benchReport` |
-| `dashboard/web/views/quality/quality.js` | `qPct`, `qBuckets`, `qFacts`, `qWhy`, `qCase`, `qModel`, `viewQuality` |
+| `dashboard/web/views/quality/quality.js` | `quality`, `qPct`, `qLabel`, `qSame`, `qScores`, `qRing`, `qHeat`, `qSpeed`, `qWhy`, `qCase`, `qReport`, `viewQuality` |
 | `dashboard/web/views/benchmark/suites.js` | `benchSuiteCells`, `benchSuiteEstS`, `benchMinutes`, `benchSuiteCard`, `benchSuiteCards`, `benchSentence`, `benchProgress`, `benchBest`, `benchSuiteOf`, `benchHistoryRow`, `benchHistory`, `benchAB`, `benchAdvanced` |
 | `dashboard/web/views/chat/chat.js` | `chatState`, `viewChat` |
 | `dashboard/web/views/dashboard/dashboard.js` | `dash`, `dashGroup`, `dashAgg`, `dashPickRun`, `dashSection`, `dashInfo`, `dashPush`, `dashSeries`, `dashLiveRun`, `dashRunStatus`, `dashPhase`, `dashLoad`, `dashUpdateSimple`, `dashHistory`, `dashWindowSeries`, `viewDashboard`, `dashSample` |
@@ -213,7 +213,7 @@ Each tab answers one question. Keep it that way.
 | Dashboard | Is it serving, how fast is it, and how does an app connect? | `/api/telemetry`, `/api/hw`, `/api/runs`, `/api/glossary`, `/api/gpus/history` | copy the URL, stop the run, copy a curl or Python request |
 | Chat | What will I ask the model? | `/api/chat`, `/api/runs` | send one prompt, stop the answer |
 | Benchmark | How fast is it, and does it read the whole prompt? | `/api/bench`, `/api/bench/suites`, `.../compare`, `/api/bench/csv` | start a bench, compare two results, download a result as CSV |
-| Quality | Does it answer right, and why did a case fail? | `/api/eval`, `/api/eval/{id}` | pick a saved eval, open the cause of a case, download the cases as CSV |
+| Quality | Does it answer right, and how do saved runs compare? | `/api/eval`, `/api/eval/{id}` | pick runs to compare, open the cases of a heatmap cell or a failing family, open the cause of a case, download the cases as CSV |
 | Topology | Can the cards copy to each other? | `/api/topo`, `/api/topo/check` | check the readiness again |
 | Fleet | What do the other hosts do? | `/api/fleet`, `/api/report` | add a host, forget a host, copy the redacted report, open that host's own dashboard |
 | Logs | What is running, and why did it fail? | `/api/runs` (state, phase sentence), `.../logs` | stop, read logs, read the findings |

@@ -441,16 +441,16 @@ KB below means 1024 bytes. These are payload sizes, not page-load timings.
 
 | Budget | Target | Measured | Note |
 |---|---|---|---|
-| The whole page (HTML + CSS + JS, uncompressed) | ≤ 444 KB | **440.9 KB** | the whole tree; raised from 436 KB for the Quality tab |
+| The whole page (HTML + CSS + JS, uncompressed) | ≤ 456 KB | **447.8 KB** | the whole tree; raised from 444 KB for the compare page of the Quality tab and the look of the Dashboard |
 | HTML | ≤ 12 KB | **6.9 KB** | `index.html` |
-| CSS | ≤ 80 KB | **78.3 KB** | shared styles plus lazy tab styles; obsolete dashboard rules removed |
-| JavaScript | ≤ 360 KB | **355.7 KB** | plain and unminified; raised from 352 KB for the Quality tab |
-| JavaScript on the first paint | ≤ 112 KB | **103.2 KB** | the shell and Setup; chooser and path runner load on demand |
+| CSS | ≤ 80 KB | **79.7 KB** | shared styles plus lazy tab styles; obsolete dashboard rules removed |
+| JavaScript | ≤ 368 KB | **361.2 KB** | plain and unminified; raised from 360 KB for the compare page of the Quality tab and the look of the Dashboard |
+| JavaScript on the first paint | ≤ 112 KB | **103.6 KB** | the shell and Setup; chooser and path runner load on demand |
 | CSS on the first paint | ≤ 40 KB | **38.6 KB** | the five initial stylesheets |
 | Fonts | ≤ 130 KB, four woff2, OFL, `font-display: swap`, `unicode-range` | **128.4 KB**, four woff2, swap ✓, range ✓ | the license texts (24.5 KB) sit next to the files; they are not loaded by the page |
 | First-paint requests | ≤ 24 | **22** (1 HTML + 5 CSS + 12 scripts + 4 fonts) | other tabs load on demand |
 | Transferred text on the first paint (gzip) | ≤ 60 KB | **48.0 KB** | initial HTML, CSS and JavaScript |
-| Text of the whole tree (gzip) | ≤ 157 KB | **154.8 KB** | 158506 bytes; raised from 153 KB for the Quality tab |
+| Text of the whole tree (gzip) | ≤ 161 KB | **157.1 KB** | 160844 bytes; raised from 157 KB for the compare page of the Quality tab and the look of the Dashboard |
 | First paint on a loopback host | ≤ 1.0 s | **unmeasured** | the binary runs on this Mac; a measurement on the reference box (par1-cs25) lands in `dashboard/README.md` when the integrator pushes |
 | The live numbers | one stream: `GET /api/telemetry` at 1 Hz drives metrics and charts | the stream | manual pause freezes metric presentation, not sampling or server health; hidden pages skip painting and pause polling |
 | The poller | one timer for the page, in `js/data.js`; no view opens its own timer | one timer | one `setTimeout` re-arms itself with a delay that grows on error (backoff, capped at 60 s) and shrinks on success |

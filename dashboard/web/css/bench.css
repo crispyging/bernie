@@ -153,3 +153,21 @@ tr.is-headline > td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
   .bench-ab { flex-direction: column; align-items: stretch; }
   .bench-ab input { width: 100%; }
 }
+
+/* ---------- the Quality tab: chips, outcome ring, heatmap ---------- */
+
+.q-chips { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: 0 0 var(--space-3); }
+.q-chip { border-radius: 999px; padding: 2px 12px; font-size: var(--small); }
+.q-overview { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-4); margin-bottom: var(--space-3); }
+.q-overview p { margin: 0 0 var(--space-1); }
+.q-display { font: 800 var(--small)/1.2 var(--font-body); letter-spacing: .08em; color: var(--muted); }
+.q-ring { width: 104px; height: 104px; border-radius: 50%; background: var(--surface-3); display: grid; place-items: center; flex: none; }
+.q-ring span { width: 76px; height: 76px; border-radius: 50%; background: var(--surface); display: grid; place-items: center; font: 800 18px var(--font-display); }
+.q-heat th { white-space: nowrap; }
+.q-cell { display: grid; width: 100%; min-width: 64px; padding: 4px 6px; text-align: center; border-radius: var(--radius-sm); }
+.q-cell small { color: var(--text-2); }
+.q-cell.good { background: color-mix(in srgb, var(--ok) 22%, transparent); }
+.q-cell.mixed { background: color-mix(in srgb, var(--warn) 22%, transparent); }
+.q-cell.poor, .q-cell.error { background: color-mix(in srgb, var(--fail) 22%, transparent); }
+.q-cell.error { outline: 1px dashed var(--fail); }
+.q-fails { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-1); }

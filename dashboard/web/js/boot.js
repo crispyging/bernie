@@ -55,6 +55,9 @@ const TAB_SCRIPTS = {
     "views/benchmark/suites.js",
   ],
   quality: [
+    "components/metrics.js",
+    "components/compare.js",
+    "views/benchmark/report.js",
     "views/quality/quality.js",
   ],
   chat: [
@@ -108,9 +111,15 @@ const tabReady = new Set(["setup"]);
 // The tabs whose files are on their way.
 const tabLoading = new Map();
 
+/** loadedScripts are the files loadScript added to the page. */
+const loadedScripts = new Set();
+
 /** loadScript adds one file of the page. The files of a bundle run in the
  *  order they are named. */
 function loadScript(src) {
+  // Two bundles may share a file: it runs once, or its constants clash.
+  if (loadedScripts.has(src)) return Promise.resolve();
+  loadedScripts.add(src);
   return new Promise((resolve, reject) => {
     const el = document.createElement("script");
     el.src = src;

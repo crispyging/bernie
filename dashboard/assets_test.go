@@ -162,10 +162,10 @@ func TestPayloadBudget(t *testing.T) {
 	// The numbers are honest: the next commit that breaks a line changes the
 	// doc first.
 	const htmlMax = 12 * 1024
-	const jsMax = 360 * 1024 // 355.7 KB now; the nine tabs of plain JavaScript
+	const jsMax = 368 * 1024 // 361.2 KB now; the nine tabs of plain JavaScript
 	const cssMax = 80 * 1024
 	const fontsMax = 130 * 1024
-	const treeMax = 444 * 1024
+	const treeMax = 456 * 1024
 	if html > htmlMax {
 		t.Errorf("html %d > %d", html, htmlMax)
 	}
@@ -210,8 +210,8 @@ func TestGzipSizeBudget(t *testing.T) {
 		t.Fatal("no text assets measured")
 	}
 	t.Logf("text assets: raw=%d gz=%d (%.0f%%)", total, gz, 100*float64(gz)/float64(total))
-	if gz > 157*1024 {
-		t.Errorf("gzipped text assets %d > 157 KB", gz)
+	if gz > 161*1024 {
+		t.Errorf("gzipped text assets %d > 161 KB", gz)
 	}
 }
 

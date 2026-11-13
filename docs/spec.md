@@ -2100,7 +2100,12 @@ Accuracy is passed ÷ graded: a skipped case is not graded, an error counts
 as not passed. The summary splits it by track and by context size
 (`by_track` and `by_context`: `name`, `passed`, `graded`, `accuracy`; the
 field is `name`, not `key`, because the dashboard redacts every field named
-like a secret) and counts critical cases and loops. A case keeps its question, the reply, the
+like a secret) and counts critical cases and loops. For the compare page it
+also has `by_family_context` and `by_family` (BroodBench's report buckets:
+`family`, `track`, `context_size`, `passed`, `failed`, `errors`, `total`
+and `accuracy` of the graded cases; a family never asked at a size has no
+entry, which is not a zero) and `speed_by_context` (the `performance` of
+the calls at every context size). A case keeps its question, the reply, the
 expected value, the tool events and the grader details. The full prompt is
 not saved: the seed, the suite and the context size give it back, less the
 distractor records `context_admission` says were removed.
@@ -2326,11 +2331,17 @@ Rules for responses and tokens:
   a route that is added later cannot forget it.
 
 The page has nine tabs: Setup, Dashboard, Chat, Benchmark, Quality,
-Topology, Fleet, Logs and Advanced. The Quality tab reads the saved results
-of `bernie bench eval` (`/api/eval`): the score of every model, by track and
-by context, the causes of the cases that did not pass, every case with a
-`Why` button that opens its diagnosis, and a link that downloads the cases
-as CSV. It starts no eval: its empty state shows the command. The theme of the page is the choice of the reader and
+Topology, Fleet, Logs and Advanced. The Quality tab is BroodBench's compare page
+over the saved results of `bernie bench eval` (`/api/eval`): the reader
+picks runs as chips (the newest by default); the page warns when they asked
+different things (version, suite, seed, contexts, temperature, repeats,
+reply tokens or tracks); one score table holds every model of every run;
+and every model gets a report: the outcome ring (pass, fail and error over
+the graded cases), the family × context heatmap, decode and prefill against
+the context, the failure focus, and the cases, which a heatmap cell or a
+failing family opens and whose `Why` opens the diagnosis, with a link that
+downloads them as CSV. It starts no eval: its empty state shows the
+command. The theme of the page is the choice of the reader and
 lives in the browser, not in the API: the rail holds the three choices in
 words, `Auto` (the default: the page follows the system and follows it
 live), `Dark` and `Light`; the choice is kept in `localStorage`

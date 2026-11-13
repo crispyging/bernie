@@ -119,3 +119,24 @@ func TestRunReportsAgentEfficiency(t *testing.T) {
 		t.Fatalf("summary %+v efficiency %+v", s, a)
 	}
 }
+
+// TestJointBuckets checks the family × context buckets of the compare page:
+// only observed cells, errors in the total, skipped cases left out.
+func TestJointBuckets(t *testing.T) {
+	cs := []CaseResult{
+		{Family: "a", Track: "recall", Context: 2048, Status: StatusPass},
+		{Family: "a", Track: "recall", Context: 2048, Status: StatusError},
+		{Family: "a", Track: "recall", Context: 8192, Status: StatusFail},
+		{Family: "b", Track: "agent", Context: 2048, Status: StatusSkipped},
+	}
+	joint, fam, speed := joints(cs)
+	if len(joint) != 2 || joint[0].Total != 2 || joint[0].Passed != 1 || joint[0].Errors != 1 || joint[0].Accuracy != 0.5 || joint[1].Failed != 1 {
+		t.Errorf("by family and context %+v", joint)
+	}
+	if len(fam) != 1 || fam[0].Family != "a" || fam[0].Total != 3 || fam[0].Context != 0 {
+		t.Errorf("by family %+v", fam)
+	}
+	if len(speed) != 2 || speed[0].Context != 2048 || speed[1].Context != 8192 {
+		t.Errorf("speed by context %+v", speed)
+	}
+}
