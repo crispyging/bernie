@@ -118,7 +118,7 @@ Regenerate the table rows with `scripts/check-web.sh --print-globals`.
 | `dashboard/web/views/advanced/report.js` | `advReportCard`, `advReportText`, `advCopyReport`, `advDownloadReport` |
 | `dashboard/web/views/advanced/power.js` | `advPowerCard`, `advPaintPower`, `advPowerRow`, `advSavePower` |
 | `dashboard/web/views/benchmark/benchmark.js` | `benchState`, `benchSection`, `benchFailed`, `benchResults`, `benchSuiteLine`, `benchHeadline`, `benchCopy`, `benchReceipt`, `benchStartError`, `cancelBench`, `deleteBenchResult`, `viewBenchmark` |
-| `dashboard/web/views/benchmark/report.js` | `benchCtx`, `benchCtxName`, `benchRefName`, `benchKpis`, `BENCH_CHARTS`, `benchGrid`, `benchChart`, `benchCharts`, `benchCellState`, `BENCH_COLS`, `benchRow`, `benchMatrix`, `benchReport` |
+| `dashboard/web/views/benchmark/report.js` | `benchCtx`, `benchCtxName`, `benchRefName`, `benchKpis`, `benchAggPrefill`, `BENCH_CHARTS`, `benchGrid`, `benchChart`, `benchCharts`, `benchCellState`, `BENCH_COLS`, `benchRow`, `benchMatrix`, `benchReport` |
 | `dashboard/web/views/benchmark/suites.js` | `benchSuiteCells`, `benchSuiteEstS`, `benchMinutes`, `benchSuiteCard`, `benchSuiteCards`, `benchSentence`, `benchProgress`, `benchBest`, `benchSuiteOf`, `benchHistoryRow`, `benchHistory`, `benchAB`, `benchAdvanced` |
 | `dashboard/web/views/chat/chat.js` | `chatState`, `viewChat` |
 | `dashboard/web/views/dashboard/dashboard.js` | `dash`, `dashGroup`, `dashAgg`, `dashPickRun`, `dashSection`, `dashInfo`, `dashPush`, `dashSeries`, `dashLiveRun`, `dashRunStatus`, `dashPhase`, `dashLoad`, `dashUpdateSimple`, `dashHistory`, `dashWindowSeries`, `viewDashboard`, `dashSample` |

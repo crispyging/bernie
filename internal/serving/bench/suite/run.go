@@ -155,6 +155,9 @@ func applyOverrides(s *Suite, o bench.Options) bench.Options {
 	if s.Recall {
 		o.Recall = true
 	}
+	if s.Probe {
+		o.Probe = true
+	}
 	o.InputLen = 0
 	o.OutputLen = 0
 	o.SizeTolerancePercent = s.SizeTolerancePercent

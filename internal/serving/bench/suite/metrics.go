@@ -243,7 +243,7 @@ func medianMeasurement(ms []bench.Measurement) bench.Measurement {
 	out.Decode = medianRate(decodes)
 	out.TTFTs = medianDist(ttfts)
 	out.ITLms = medianDist(itls)
-	out.ServerSide = medianServerSide(sides)
+	out.ServerSide, out.Probe = medianServerSide(sides), medianProbe(ms)
 	out.TokensExact = true
 	out.OutputValid = true
 	out.StreamIncremental = true
@@ -377,6 +377,7 @@ func repOf(c bench.Cell) bench.Rep {
 			TTFTs:                  c.TTFTs,
 			ITLms:                  c.ITLms,
 			ServerSide:             c.ServerSide,
+			Probe:                  c.Probe,
 			TokensExact:            c.TokensExact,
 			TTFTP50:                c.TTFTP50,
 			TTFTP95:                c.TTFTP95,

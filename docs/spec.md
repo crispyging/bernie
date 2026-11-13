@@ -1599,6 +1599,7 @@ field has no advice.
 | `--seed` | `0` | Prompt seed. |
 | `--tag` | none | Free label stored with the result. |
 | `--recall` | off | Hide a short random fact in every prompt and check the reply. |
+| `--probe` | off | Send the prefill probe before every cell (§10.1). |
 | `--suite` | none | Run a built-in suite instead of the flags above. The suite decides the cells, the repetitions, the warm-up and the recall gate. |
 
 Every prompt gets a unique salt so the prefix cache does not change the
@@ -1694,6 +1695,7 @@ Cell fields:
 | `mean_prompt_tokens`, `mean_output_tokens`, `mean_cached_prompt_tokens`, `tokens_per_chunk` | Real sizes seen. |
 | `duration_s`, `errors` | Wall time; sample of error strings. |
 | `recall` | Pass key check of the cell: `asked`, `passed`, `depth`, `method`. Absent when the check did not run. |
+| `probe` | The prefill probe of the cell (below): `requests`, `completed`, `wall_s`, `prompt_tokens`, `cached_tokens`, `agg_tok_s`, `ttft_s` and `unavailable`. Absent when the run sent no probe. |
 | `check` | The declared-answer verdict of the cell: `asked`, `passed`, `method`. It is separate from `recall`, so a group of kind `check` stays distinguishable in one result. Absent when the check did not run. |
 | `group`, `input_len`, `output_len` | The suite group of the cell and the lens of that group. Absent in a plain run. |
 | `kind` | What the cell asserts: `throughput` (a speed) or `check` (a declared answer). Absent in a plain run. |
@@ -1707,6 +1709,20 @@ Cell fields:
 | `stream_incremental` | False when a reply arrived in one chunk: the server buffered the whole answer, so there is no decode window. |
 
 A cell where every request fails makes `bench` exit 1 and saves nothing.
+
+The prefill probe measures the prefill throughput of the whole server at
+the concurrency of a cell, without the decode of other requests in the way.
+With `--probe`, or in a suite with `probe: true`, bernie sends one wave of
+as many simultaneous requests as the cell has in flight before the measured
+requests of the cell, after the warm-up. Each probe request has
+`max_tokens` 1, its own salt and the prompt length of the cell. The rate is
+`agg_tok_s` = (Σ `prompt_tokens` − Σ `cached_tokens`) ÷ the wall time of the
+wave. The wall time holds the queueing, the transport and the one sampled
+token, so the rate slightly understates the pure prefill. A wave with a
+failed request, or without token usage, has no rate: `unavailable` says
+why, and the dashboard shows it under the cell. The probe requests are not
+counted in the cell. The repetitions of a suite cell merge into the median
+rate of the probes that measured one.
 
 The gates name why a number may not be a speed number. A cell that is off
 size, degenerate or buffered keeps its numbers visible, because hiding a
@@ -1722,7 +1738,7 @@ has one too. The dashboard shows these numbers as its four headline cards.
 |---|---|
 | `peak_output_tok_s`, `peak` | The highest `output_tok_s` of a cell that ran, and that cell: `group`, `input_len` and `concurrency`. |
 | `single_decode_tok_s` | The median per-request decode rate at concurrency 1, at the shortest context that ran at that level. |
-| `single_prefill_tok_s` | The prefill rate (`prefill.agg_tok_s`) of the same cell. It holds the queueing of the cell. |
+| `single_prefill_tok_s`, `single_prefill_source` | The aggregate prefill of the same cell and where it comes from: `probe` (`probe.agg_tok_s`) when the cell has a probe rate, else `cell` (`prefill.agg_tok_s`, which holds the queueing of the cell). |
 | `single` | That cell: `group`, `input_len` and `concurrency`. |
 | `requests`, `completed`, `failed` | The measured requests of the cells that ran: sent, answered and failed. |
 | `cells`, `skipped`, `incomplete` | Every cell, the cells never sent and the cells that lost a request. |
@@ -1797,7 +1813,7 @@ groups:
 The loader is strict: an unknown key, a `schema` other than `1`, a group
 without a lens or without a level, a negative length or an empty group
 list is refused. The defaults of a file that leaves a value out: `reps` 1,
-`warmup` 0, `seed` 0, `recall` off, `band` 0.02, `steady` 0.95,
+`warmup` 0, `seed` 0, `recall` off, `probe` off, `band` 0.02, `steady` 0.95,
 `size_tolerance_percent` 2, the kind `throughput` and the source
 `synthetic`.
 
@@ -1820,8 +1836,12 @@ curve.
 The built-in `pr-smoke` suite is the fixed PR smoke matrix of BroodBench:
 2048, 4096, 8192 and 16384 prompt tokens at the levels 1 and 8, then 32768,
 65536 and 131072 at the levels 1 and 4, 256 output tokens and 16 requests a
-cell. The cells are the same on every build, so two results line up row
-for row.
+cell. It sends the prefill probe before every cell. The cells are the same
+on every build, so two results line up row for row.
+
+`probe: true` sends the prefill probe of §10.1 before every cell of the
+suite. The canonical form leaves `probe` out when it is off, so a suite
+without it keeps its digest.
 
 The digest of a suite is the sha256 of its canonical form. Every result of
 a suite run carries the digest, so two runs of different suites are never

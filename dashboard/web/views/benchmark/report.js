@@ -33,8 +33,15 @@ function benchKpis(r) {
   return h("dl.facts.bench-kpis",
     fact("Peak output", rate(s.peak_output_tok_s, 1), "aggregate, " + benchRefName(s.peak)),
     fact("Single-stream decode", rate(s.single_decode_tok_s, 1), "one request, " + single),
-    fact("Prefill at c=1", rate(s.single_prefill_tok_s, 0), single + "; includes queueing"),
+    fact("Prefill at c=1", rate(s.single_prefill_tok_s, 0), single +
+      (s.single_prefill_source === "probe" ? ", max_tokens=1 probe" : "; includes queueing")),
     fact("Requests ok", (s.completed || 0) + " / " + (s.requests || 0), left.join(", ") || "none failed"));
+}
+
+/** benchAggPrefill is the aggregate prefill of a cell: the rate of its probe
+ *  when the run sent one, else the rate of the cell. */
+function benchAggPrefill(c) {
+  return (c.probe && c.probe.agg_tok_s) || (c.prefill || {}).agg_tok_s;
 }
 
 /** BENCH_CHARTS are the three charts of a result: the metric, its title, its
@@ -42,8 +49,8 @@ function benchKpis(r) {
 const BENCH_CHARTS = [
   { get: (c) => c.output_tok_s, title: "Output throughput", unit: "tok/s", digits: 0,
     note: "All completion tokens of the cell ÷ its wall time." },
-  { get: (c) => (c.prefill || {}).agg_tok_s, title: "Aggregate prefill", unit: "tok/s", digits: 0,
-    note: "Prompt tokens of the cell ÷ the time to the last first token; includes queueing." },
+  { get: benchAggPrefill, title: "Aggregate prefill", unit: "tok/s", digits: 0,
+    note: "N simultaneous max_tokens=1 requests: computed prompt tokens ÷ wall time. Without the probe, the cell's rate, queueing included." },
   { get: (c) => (c.ttft_s || {}).p50, title: "Time to first token, p50", unit: "s", digits: 2,
     note: "Includes queueing behind the other requests in flight." },
 ];
@@ -119,6 +126,7 @@ function benchCellState(c) {
   if (c.failed) why.push(c.failed + " of " + c.num_prompts + " requests failed.");
   for (const e of c.errors || []) why.push("Error: " + e);
   if (c.warmup_failed) why.push(c.warmup_failed + " warm-up requests failed.");
+  if (c.probe && c.probe.unavailable) why.push("Prefill probe: " + c.probe.unavailable + ".");
   if (c.incomplete) why.push("The cell lost a warm-up or a repetition, so no verdict is issued for it.");
   for (const f of cellFlags(c)) if (f.text !== "a request was lost") why.push("Flag: " + f.text + ".");
   if (!c.completed) return { kind: "fail", word: "failed", why: why };
@@ -131,7 +139,7 @@ function benchCellState(c) {
 const BENCH_COLS = [
   ["OUTPUT", "tok/s", (c) => benchNum(c.output_tok_s, 1)],
   ["DECODE", "tok/s / req p50", (c) => benchNum(((c.decode || {}).req || {}).p50, 1)],
-  ["PREFILL", "tok/s agg", (c) => benchNum((c.prefill || {}).agg_tok_s, 0)],
+  ["PREFILL", "tok/s agg", (c) => benchNum(benchAggPrefill(c), 0) + (c.probe && c.probe.agg_tok_s ? " probe" : "")],
   ["PREFILL", "tok/s / req p50", (c) => benchNum(((c.prefill || {}).req || {}).p50, 0)],
   ["TTFT", "s p50 / p95", (c) => benchNum((c.ttft_s || {}).p50, 3) + " / " + benchNum((c.ttft_s || {}).p95, 3)],
   ["ITL", "ms p50 / p95", (c) => benchNum((c.itl_ms || {}).p50, 1) + " / " + benchNum((c.itl_ms || {}).p95, 1)],

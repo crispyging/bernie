@@ -74,6 +74,10 @@ type Suite struct {
 	Seed int64 `yaml:"seed" json:"seed"`
 	// Recall turns on the pass key check of every prompt.
 	Recall bool `yaml:"recall" json:"recall"`
+	// Probe sends the prefill probe before every cell (spec §10.1). It is
+	// left out of the digest when it is off, so the older suites keep
+	// their digest.
+	Probe bool `yaml:"probe" json:"probe,omitempty"`
 	// RequestTimeoutS bounds one request of a cell.
 	RequestTimeoutS int `yaml:"request_timeout_s" json:"request_timeout_s,omitempty"`
 	// CooldownS is the pause between two repetitions.

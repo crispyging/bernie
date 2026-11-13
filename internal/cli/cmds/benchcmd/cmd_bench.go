@@ -77,6 +77,7 @@ func runBench(c *cli.Context, cmd *cli.Command, args []string) error {
 	fs.Int64Var(&o.Seed, "seed", 0, "prompt seed")
 	fs.StringVar(&o.Tag, "tag", "", "free label stored with the result")
 	fs.BoolVar(&o.Recall, "recall", false, "hide a short random fact in every prompt and check the reply")
+	fs.BoolVar(&o.Probe, "probe", false, "send a prefill probe before every cell: N simultaneous max_tokens=1 requests")
 	fs.StringVar(&o.Suite, "suite", "", "run a built-in suite (bernie bench suites lists them)")
 	pos, err := cli.Parse(fs, args)
 	if err != nil {

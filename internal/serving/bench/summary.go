@@ -11,10 +11,13 @@ type Summary struct {
 	// SingleDecodeTokS is the median decode rate of one request at
 	// concurrency 1, at the shortest context that ran at that level.
 	// SinglePrefillTokS is the prefill rate of the same cell, and Single
-	// names it.
-	SingleDecodeTokS  float64  `json:"single_decode_tok_s,omitempty"`
-	SinglePrefillTokS float64  `json:"single_prefill_tok_s,omitempty"`
-	Single            *CellRef `json:"single,omitempty"`
+	// names it. SinglePrefillSource says where the rate comes from:
+	// "probe" (the prefill probe of the cell) or "cell" (the prefill rate
+	// of the measured requests, queueing included).
+	SingleDecodeTokS    float64  `json:"single_decode_tok_s,omitempty"`
+	SinglePrefillTokS   float64  `json:"single_prefill_tok_s,omitempty"`
+	SinglePrefillSource string   `json:"single_prefill_source,omitempty"`
+	Single              *CellRef `json:"single,omitempty"`
 	// Requests, Completed and Failed count the measured requests of the
 	// cells that ran.
 	Requests  int `json:"requests"`
@@ -59,10 +62,7 @@ func headline(r *Result) *Summary {
 		if c.Concurrency == 1 && (s.Single == nil || ref.InputLen < s.Single.InputLen) {
 			s.Single = ref
 			s.SingleDecodeTokS = singleDecode(c)
-			s.SinglePrefillTokS = 0
-			if c.Prefill != nil {
-				s.SinglePrefillTokS = c.Prefill.AggTokS
-			}
+			s.SinglePrefillTokS, s.SinglePrefillSource = cellPrefill(c)
 		}
 	}
 	return s
@@ -88,4 +88,16 @@ func singleDecode(c Cell) float64 {
 		return c.Decode.Req.P50
 	}
 	return c.Decode.AggTokS
+}
+
+// cellPrefill is the aggregate prefill rate of a cell and where it comes
+// from: the probe when it measured one, else the rate of the cell.
+func cellPrefill(c Cell) (float64, string) {
+	if c.Probe != nil && c.Probe.AggTokS > 0 {
+		return c.Probe.AggTokS, "probe"
+	}
+	if c.Prefill != nil && c.Prefill.AggTokS > 0 {
+		return c.Prefill.AggTokS, "cell"
+	}
+	return 0, ""
 }

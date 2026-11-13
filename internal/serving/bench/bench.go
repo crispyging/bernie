@@ -52,6 +52,9 @@ type Options struct {
 	// SizeTolerancePercent is the share of the prompt length a cell may
 	// miss. Zero takes the default of 2 %.
 	SizeTolerancePercent float64 `json:"size_tolerance_percent,omitempty"`
+	// Probe sends the prefill probe before every cell: as many
+	// simultaneous max_tokens=1 requests as the cell has in flight.
+	Probe bool `json:"probe,omitempty"`
 }
 
 // Measurement holds the numbers of a cell or of one repetition of it.
@@ -69,6 +72,9 @@ type Measurement struct {
 	// ServerSide is what the server measured over the same requests. It is
 	// nil when the server has no metrics.
 	ServerSide *ServerSide `json:"server_side,omitempty"`
+	// Probe is the prefill probe of the cell. It is nil when the run sent
+	// none.
+	Probe *Probe `json:"probe,omitempty"`
 	// TokensExact tells whether the token counts of the cell come from the
 	// server's usage. False when a request came without usage.
 	TokensExact bool    `json:"tokens_exact"`
