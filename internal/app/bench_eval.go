@@ -39,3 +39,17 @@ func BenchEval(ctx context.Context, o eval.Options, progress io.Writer) (*eval.R
 	}
 	return r, path, nil
 }
+
+// BenchEvalPropose asks the model of a private server to suggest an eval
+// run for a goal (spec §10.5). It sends one chat request and starts
+// nothing: the proposal carries the command to run. An empty URL is the
+// server of the only run, else the default of bernie bench.
+func BenchEvalPropose(ctx context.Context, o eval.Options, goal string) *eval.Proposal {
+	if o.URL == "" {
+		o.URL = bench.DefaultURL()
+	}
+	if o.APIKey == "" {
+		o.APIKey = os.Getenv(EvalKeyEnv)
+	}
+	return eval.Propose(ctx, o, goal)
+}

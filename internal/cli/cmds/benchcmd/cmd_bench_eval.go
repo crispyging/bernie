@@ -17,7 +17,7 @@ import (
 )
 
 // benchEvalCommand is `bernie bench eval`: the quality evaluation of spec
-// §10.5, with list, show and tracks below it.
+// §10.5, with list, show, tracks and propose below it.
 func benchEvalCommand() *cli.Command {
 	cmd := &cli.Command{Name: "eval", Summary: "Grade the answers of a server on seeded technical-workflow cases",
 		Usage: "[--url U] [--kind openai|openwebui] [--model M[,M2]] [--suite smoke|core|extended] [--context 4096[,16384]] [--tracks T,...] [--seed N] [--repeats N]"}
@@ -62,7 +62,7 @@ func benchEvalCommand() *cli.Command {
 			}
 		})
 	}
-	cmd.Subs = []*cli.Command{list, show, tracks}
+	cmd.Subs = []*cli.Command{list, show, tracks, benchEvalProposeCommand()}
 	return cmd
 }
 
@@ -88,7 +88,7 @@ func runEval(c *cli.Context, cmd *cli.Command, args []string) error {
 		return err
 	}
 	if len(pos) > 0 {
-		return cli.Usagef("unexpected argument %q (subcommands: list, show, tracks)", pos[0])
+		return cli.Usagef("unexpected argument %q (subcommands: list, show, tracks, propose)", pos[0])
 	}
 	o.Models = splitList(models)
 	o.Tracks = splitList(tracks)

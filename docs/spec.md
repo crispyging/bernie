@@ -293,6 +293,7 @@ other file, script or compose file is required.
 | `bernie bench ab --base ARM --cand ARM` | yes (it starts and stops a server for every arm) | Run a baseline and a candidate in the order base, cand, cand, base and tell the verdict. |
 | `bernie bench eval [--url U] [--kind K] [--model M,...] [--suite S] [--context N,...] [--tracks T,...] [--seed N] [--repeats N]` | no | Grade the answers of a server on seeded technical-workflow cases. Save the result ([§10.5](#105-quality-evaluation)). |
 | `bernie bench eval list` / `eval show <ID>` / `eval tracks` | no | Saved eval results; the suites and the tracks. |
+| `bernie bench eval propose --goal TEXT [--url U] [--kind K] [--model M]` | no | Ask the local model to suggest an eval run for a goal; print the checked run and its command. Starts nothing ([§10.5](#105-quality-evaluation)). |
 | `bernie config show` / `config set <KEY> <VALUE>` | yes (config file) | User defaults. |
 | `bernie fleet add <NAME> <URL> [--token T]` / `fleet rm <NAME>` / `fleet ls` | yes (config file) | List of other bernie hosts the Fleet tab watches. The token is stored in the config file with `0600`; it is never sent to the browser ([§11](#11-dashboard)). |
 | `bernie dash [--listen ADDR] [--token T] [--demo] [--host]` | no | Start the dashboard in the foreground. `--demo` serves a captured host and a fake run from a sandbox under the user cache, with the banner "Demo: nothing here is real"; it needs no GPU and changes nothing on the host. `--host` binds every interface ([§3.2](#32-rules)). |
@@ -2065,6 +2066,30 @@ reply. The summary of a model counts the categories and the scenario
 families of the cases that did not pass in `failure_categories` and
 `failure_families`, and the text output prints the title of the diagnosis
 next to every case that did not pass.
+
+`bernie bench eval propose --goal TEXT` is BroodBench's advisor. It asks
+the model under test to suggest an eval run for a goal in words, checks the
+answer, and prints the run and the `bernie bench eval` command that runs
+it. It starts nothing and saves nothing.
+
+- The server must resolve only to private, loopback, link-local or shared
+  (100.64.0.0/10, Tailscale) addresses, so the goal never leaves the
+  operator's networks. Its model must report `max_model_len`.
+- It sends one chat request: temperature 0, 1024 reply tokens, a 60 s
+  limit. The prompt names the suites, the tracks, the limit of the server
+  and the caps below.
+- The answer must be one strict JSON object (no prose, no code fence, no
+  repeated key) with exactly the keys `suite`, `context_sizes`,
+  `max_tokens`, `timeout_s`, `repeats`, `temperature`, `tracks`, `seed`
+  and `rationale`. The caps: a known suite; 1 to 8 new context sizes, each
+  with size + `max_tokens` + 512 within the limit; `max_tokens` 1 to 4096;
+  `timeout_s` 1 to 60; `repeats` exactly 1; `temperature` exactly 0; at
+  least one known track, none twice; a signed 32-bit seed; a rationale of
+  1 to 1000 characters; and at most 128 MiB of planned prompts (the sum of
+  the sizes × 4 bytes × the number of cases).
+- `--json` prints `{"ok", "options", "command", "rationale", "checks",
+  "latency_s", "response", "error"}`. A refused proposal keeps the answer
+  of the model in `response`, says why in `error`, and exits 1.
 
 ## 11. Dashboard
 
