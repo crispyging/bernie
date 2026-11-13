@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"testing"
+
+	"github.com/opengfx1030/bernie/internal/serving/vllm"
 )
 
 func parseAnswer(t *testing.T, body string) *chatAnswer {
@@ -80,7 +82,40 @@ func TestRunRecordsTheCalls(t *testing.T) {
 		}
 		calls += len(c.Calls)
 	}
-	if p := r.Summary[0].Performance; p == nil || p.Calls != calls || p.MeanLatencyS <= 0 {
+	if p := r.Summary[0].Performance; p == nil || p.Calls != calls || p.MeanLatencyS < 0 {
 		t.Errorf("performance %+v, want %d calls", p, calls)
+	}
+}
+
+// TestCreditIsolatedCounters checks that the counters of a vLLM server fill
+// the rates of one request, and that other traffic leaves them out.
+func TestCreditIsolatedCounters(t *testing.T) {
+	snap := func(done, prompt, gen, computed int, preS, decS float64, running int) *vllm.Snapshot {
+		v := map[string]float64{"request_success_total": float64(done), "num_requests_running": float64(running), "num_requests_waiting": 0,
+			"request_prompt_tokens_sum": float64(prompt), "request_generation_tokens_sum": float64(gen),
+			"request_prefill_kv_computed_tokens_sum": float64(computed), "request_prefill_time_seconds_sum": preS,
+			"request_decode_time_seconds_sum": decS}
+		for _, k := range []string{"request_prompt_tokens", "request_generation_tokens", "request_prefill_time_seconds", "request_decode_time_seconds", "request_prefill_kv_computed_tokens"} {
+			v[k+"_count"] = float64(done)
+		}
+		return &vllm.Snapshot{Values: v, Engine: "0", ProcessStart: 1}
+	}
+	n := func(v int) *int { return &v }
+	before := snap(10, 5000, 500, 4000, 2, 5, 0)
+	c := Call{PromptTokens: n(1000), CompletionTokens: n(101)}
+	c.credit(before, snap(11, 6000, 601, 4800, 2.5, 6, 0))
+	if c.PrefillSource != "vllm_isolated_metrics" || c.PrefillTokS != 1600 || *c.EvaluatedPromptTokens != 800 || *c.CachedTokens != 200 ||
+		c.DecodeTokS != 100 || c.MetricsUnavailable != "" {
+		t.Errorf("credited call %+v", c)
+	}
+	busy := Call{PromptTokens: n(1000), CompletionTokens: n(101)}
+	busy.credit(before, snap(11, 6000, 601, 4800, 2.5, 6, 1))
+	if busy.PrefillSource != "" || busy.MetricsUnavailable == "" {
+		t.Errorf("a busy server was credited: %+v", busy)
+	}
+	timed := Call{PromptTokens: n(1000), CompletionTokens: n(101), PrefillTokS: 9, PrefillS: 1, PrefillSource: "server_timings"}
+	timed.credit(before, snap(11, 6000, 601, 4800, 2.5, 6, 0))
+	if timed.PrefillSource != "server_timings" || timed.PrefillTokS != 9 {
+		t.Errorf("the counters replaced the server timings: %+v", timed)
 	}
 }

@@ -64,8 +64,16 @@ func TestRunSendsTheProbe(t *testing.T) {
 		if p == nil || p.Requests != c.Concurrency || p.Completed != c.Concurrency || p.Unavailable != "" {
 			t.Fatalf("c=%d: probe = %+v, want %d completed requests", c.Concurrency, p, c.Concurrency)
 		}
-		if want := float64(p.PromptTokens-p.CachedTokens) / p.WallS; p.AggTokS != want || p.AggTokS <= 0 {
+		// The fake publishes vLLM's per-request counters, so the rate is the
+		// prompt tokens the server computed over the wall time of the wave.
+		if p.Server == nil || p.Source != "vllm_metrics" || p.ServerUnavailable != "" {
+			t.Fatalf("c=%d: probe server %+v source %q: %s", c.Concurrency, p.Server, p.Source, p.ServerUnavailable)
+		}
+		if want := float64(p.Server.ComputedPromptTokens) / p.WallS; p.AggTokS != want || p.AggTokS <= 0 {
 			t.Errorf("c=%d: probe rate %v, want %v", c.Concurrency, p.AggTokS, want)
+		}
+		if b := c.ServerBatch; b == nil || b.Requests != 4 || b.PrefillTokS <= 0 || c.ServerBatchUnavailable != "" {
+			t.Errorf("c=%d: server batch %+v: %s", c.Concurrency, b, c.ServerBatchUnavailable)
 		}
 		if c.MeanOutputTokens != 8 {
 			t.Errorf("c=%d: the measured requests answered %v tokens, want 8: the probe leaked into the cell", c.Concurrency, c.MeanOutputTokens)

@@ -39,7 +39,7 @@ Packages are grouped by role: `internal/machine` (what the host is),
 | `internal/serving/recipe` | the recipe and its launch plan | `Load`, `Resolve`, `Validate`, `CheckFit`, `List`, `Best`, `BuildPlan`, `Plan` | 2 |
 | `internal/serving/runner` | the run | `Prepare`, `Start`, `List`, `Stop`, `Logs`, `Get`, `OpenLog`, `Phase` | 2 |
 | `internal/serving/tuning` | the tuning rows and the power cap | `Profiles`, `Select`, `Materialize`, `Env`, `PowerStatus`, `LoadPowerDesired`, `SavePowerDesired`, `GeneratePowerUnits`, `ApplyPowerDesired` | 2 |
-| `internal/serving/vllm` | the vLLM client | `New`, `BaseURL`, `Health`, `Models`, `Tokenize`, `Complete`, `Metrics`, `ParseMetrics`, `Summarize`, `Histograms`, `Stats`, `Latency`, `Window`, `Reading`, `Watcher`, `NewWatcher`, `DefaultWindow` | 2 |
+| `internal/serving/vllm` | the vLLM client | `New`, `BaseURL`, `Health`, `Models`, `Tokenize`, `Complete`, `Metrics`, `ParseMetrics`, `Snapshot`, `SnapshotOf`, `Attribution`, `Attribute`, `WaitIdle`, `Summarize`, `Histograms`, `Stats`, `Latency`, `Window`, `Reading`, `Watcher`, `NewWatcher`, `DefaultWindow` | 2 |
 | `internal/serving/vllm/vllmtest` | the deterministic fake vLLM server for tests | `Config`, `Server`, `New`, `CountTokens`, `Prompts`, `ServeHTTP` | 2 |
 | `internal/serving/bench` | the benchmark | `Run`, `Save`, `List`, `Get`, `Options`, `Result` | 2 |
 | `internal/serving/bench/suite` | the bench suites | `Load`, `List`, `Get`, `Run`, `Compare`, `Judge`, `AB` | 2 |

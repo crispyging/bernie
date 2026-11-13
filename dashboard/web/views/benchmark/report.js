@@ -126,21 +126,29 @@ function benchCellState(c) {
   if (c.failed) why.push(c.failed + " of " + c.num_prompts + " requests failed.");
   for (const e of c.errors || []) why.push("Error: " + e);
   if (c.warmup_failed) why.push(c.warmup_failed + " warm-up requests failed.");
-  if (c.probe && c.probe.unavailable) why.push("Prefill probe: " + c.probe.unavailable + ".");
   if (c.incomplete) why.push("The cell lost a warm-up or a repetition, so no verdict is issued for it.");
   for (const f of cellFlags(c)) if (f.text !== "a request was lost") why.push("Flag: " + f.text + ".");
-  if (!c.completed) return { kind: "fail", word: "failed", why: why };
-  if (c.failed || c.incomplete) return { kind: "serious", word: "incomplete", why: why };
-  return why.length ? { kind: "warn", word: "flagged", why: why } : { kind: "ok", word: "ok", why: why };
+  // A measurement the server could not give is a note: it does not flag
+  // the cell.
+  const notes = [["Prefill probe", (c.probe || {}).unavailable], ["Probe server counters", (c.probe || {}).server_unavailable],
+    ["Server counters", c.server_batch_unavailable]].filter((n) => n[1]).map((n) => n[0] + " unavailable: " + n[1] + ".");
+  const st = !c.completed ? ["fail", "failed"] : c.failed || c.incomplete ? ["serious", "incomplete"] : why.length ? ["warn", "flagged"] : ["ok", "ok"];
+  return { kind: st[0], word: st[1], why: why.concat(notes) };
+}
+
+/** benchServer is the rate the server's counters give, after the client's. */
+function benchServer(c, key, d) {
+  const v = (c.server_batch || {})[key];
+  return v ? " (server " + benchNum(v, d) + ")" : "";
 }
 
 /** BENCH_COLS are the columns of the table: the head, the unit and the text
  *  of a cell. */
 const BENCH_COLS = [
   ["OUTPUT", "tok/s", (c) => benchNum(c.output_tok_s, 1)],
-  ["DECODE", "tok/s / req p50", (c) => benchNum(((c.decode || {}).req || {}).p50, 1)],
+  ["DECODE", "tok/s / req p50", (c) => benchNum(((c.decode || {}).req || {}).p50, 1) + benchServer(c, "decode_tok_s", 1)],
   ["PREFILL", "tok/s agg", (c) => benchNum(benchAggPrefill(c), 0) + (c.probe && c.probe.agg_tok_s ? " probe" : "")],
-  ["PREFILL", "tok/s / req p50", (c) => benchNum(((c.prefill || {}).req || {}).p50, 0)],
+  ["PREFILL", "tok/s / req p50", (c) => benchNum(((c.prefill || {}).req || {}).p50, 0) + benchServer(c, "prefill_tok_s", 0)],
   ["TTFT", "s p50 / p95", (c) => benchNum((c.ttft_s || {}).p50, 3) + " / " + benchNum((c.ttft_s || {}).p95, 3)],
   ["ITL", "ms p50 / p95", (c) => benchNum((c.itl_ms || {}).p50, 1) + " / " + benchNum((c.itl_ms || {}).p95, 1)],
   ["TOKENS", "in / out / cached", (c) => benchNum(c.mean_prompt_tokens, 0) + " / " +

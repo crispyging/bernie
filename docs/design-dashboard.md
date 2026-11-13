@@ -441,10 +441,10 @@ KB below means 1024 bytes. These are payload sizes, not page-load timings.
 
 | Budget | Target | Measured | Note |
 |---|---|---|---|
-| The whole page (HTML + CSS + JS, uncompressed) | ≤ 436 KB | **433.6 KB** | the whole tree; raised from 432 KB for the attach form and the grouping of chart points |
+| The whole page (HTML + CSS + JS, uncompressed) | ≤ 436 KB | **434.1 KB** | the whole tree; raised from 432 KB for the attach form and the grouping of chart points |
 | HTML | ≤ 12 KB | **6.6 KB** | `index.html` |
 | CSS | ≤ 80 KB | **78.3 KB** | shared styles plus lazy tab styles; obsolete dashboard rules removed |
-| JavaScript | ≤ 352 KB | **348.7 KB** | plain and unminified; raised from 348 KB for the attach form and the grouping of chart points |
+| JavaScript | ≤ 352 KB | **349.2 KB** | plain and unminified; raised from 348 KB for the attach form and the grouping of chart points |
 | JavaScript on the first paint | ≤ 112 KB | **103.0 KB** | the shell and Setup; chooser and path runner load on demand |
 | CSS on the first paint | ≤ 40 KB | **38.6 KB** | the five initial stylesheets |
 | Fonts | ≤ 130 KB, four woff2, OFL, `font-display: swap`, `unicode-range` | **128.4 KB**, four woff2, swap ✓, range ✓ | the license texts (24.5 KB) sit next to the files; they are not loaded by the page |

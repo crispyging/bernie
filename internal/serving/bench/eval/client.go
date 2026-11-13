@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/opengfx1030/bernie/internal/serving/vllm"
 )
 
 // Kinds of server a run talks to.
@@ -23,6 +25,8 @@ type client struct {
 	key     string
 	timeout time.Duration
 	hc      *http.Client
+	// vc reads the /metrics of an openai-kind server; nil for Open WebUI.
+	vc *vllm.Client
 }
 
 func newClient(o Options) *client {
@@ -36,7 +40,11 @@ func newClient(o Options) *client {
 	}
 	// No redirect is followed: the key goes to the address the operator named.
 	hc := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
-	return &client{base: base, key: o.APIKey, timeout: time.Duration(o.TimeoutS) * time.Second, hc: hc}
+	c := &client{base: base, key: o.APIKey, timeout: time.Duration(o.TimeoutS) * time.Second, hc: hc}
+	if o.Kind == KindOpenAI {
+		c.vc = vllm.New(strings.TrimSuffix(base, "/v1"))
+	}
+	return c
 }
 
 type servedModel struct {

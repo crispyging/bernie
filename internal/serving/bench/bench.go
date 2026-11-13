@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/opengfx1030/bernie/internal/serving/vllm"
 	"github.com/opengfx1030/bernie/internal/serving/weights"
 )
 
@@ -75,6 +76,11 @@ type Measurement struct {
 	// Probe is the prefill probe of the cell. It is nil when the run sent
 	// none.
 	Probe *Probe `json:"probe,omitempty"`
+	// ServerBatch is what the server's counters say about the measured
+	// requests: their prefill and decode rates per request. When the
+	// counters cannot be credited to them, ServerBatchUnavailable says why.
+	ServerBatch            *vllm.Attribution `json:"server_batch,omitempty"`
+	ServerBatchUnavailable string            `json:"server_batch_unavailable,omitempty"`
 	// TokensExact tells whether the token counts of the cell come from the
 	// server's usage. False when a request came without usage.
 	TokensExact bool    `json:"tokens_exact"`

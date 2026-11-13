@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"time"
+
+	"github.com/opengfx1030/bernie/internal/serving/vllm"
 )
 
 // Probe is the prefill probe of a cell (spec §10.1): as many simultaneous
@@ -29,16 +31,23 @@ type Probe struct {
 	TTFTs *Dist `json:"ttft_s,omitempty"`
 	// Unavailable says why the probe has no rate.
 	Unavailable string `json:"unavailable,omitempty"`
+	// Source says where the rate comes from: vllm_metrics (the prompt
+	// tokens the server computed, from its counters) or client_usage.
+	Source string `json:"source,omitempty"`
+	// Server is what the server's counters say about the wave; when they
+	// cannot be credited to it, ServerUnavailable says why.
+	Server            *vllm.Attribution `json:"server,omitempty"`
+	ServerUnavailable string            `json:"server_unavailable,omitempty"`
 }
 
 // ProbeTokens is the max_tokens of a probe request.
 const ProbeTokens = 1
 
 // runProbe sends one probe wave of n simultaneous requests and measures it.
-func runProbe(ctx context.Context, n int, send func(context.Context, time.Time) sample) *Probe {
+func runProbe(ctx context.Context, n int, send func(context.Context, time.Time) sample) (*Probe, []sample) {
 	start := time.Now()
 	samples := runPool(ctx, n, n, start, send)
-	return measureProbe(samples, time.Since(start))
+	return measureProbe(samples, time.Since(start)), samples
 }
 
 // measureProbe turns the samples of a probe wave into its rate. A wave with

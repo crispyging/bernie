@@ -1,8 +1,12 @@
 package eval
 
 import (
+	"context"
 	"encoding/json"
 	"slices"
+	"time"
+
+	"github.com/opengfx1030/bernie/internal/serving/vllm"
 )
 
 // Call is the telemetry of one chat request of a case (spec §10.5), the
@@ -31,6 +35,51 @@ type Call struct {
 	DecodeS       float64 `json:"decode_s,omitempty"`
 	DecodeSource  string  `json:"decode_source,omitempty"`
 	Error         string  `json:"error,omitempty"`
+	// MetricsUnavailable says why the counters of a vLLM server could not
+	// be credited to this request alone.
+	MetricsUnavailable string `json:"metrics_unavailable,omitempty"`
+}
+
+// counters reads the request counters of model once the server is idle
+// and, after since, has counted this request. It is nil for a server
+// without vLLM's per-request counters.
+func (c *client) counters(ctx context.Context, model string, since *vllm.Snapshot, limit time.Duration) *vllm.Snapshot {
+	if c.vc == nil {
+		return nil
+	}
+	expected := 0
+	if since != nil {
+		expected = 1
+	}
+	return vllm.SnapshotOf(vllm.WaitIdle(ctx, c.vc, model, since, expected, limit), model)
+}
+
+// credit fills the rates the server did not report in its answer from its
+// counters, when they hold for this request alone (the port of
+// BroodBench's isolated_measurement): the server idle at both moments,
+// one more completed request, and its token sums equal to the usage.
+func (c *Call) credit(before, after *vllm.Snapshot) {
+	if c.PromptTokens == nil || c.CompletionTokens == nil {
+		c.MetricsUnavailable = "the answer carried no usage"
+		return
+	}
+	a, why := vllm.Attribute(before, after, 1, *c.PromptTokens, *c.CompletionTokens)
+	if a == nil {
+		c.MetricsUnavailable = why
+		return
+	}
+	if c.PrefillSource == "" {
+		n := a.ComputedPromptTokens
+		c.EvaluatedPromptTokens = &n
+		c.PrefillTokS, c.PrefillS, c.PrefillSource = a.PrefillTokS, a.PrefillS, "vllm_isolated_metrics"
+	}
+	if c.DecodeSource == "" && a.DecodeTokS > 0 {
+		c.DecodeTokS, c.DecodeS, c.DecodeSource = a.DecodeTokS, a.DecodeS, "vllm_isolated_metrics"
+	}
+	if c.CachedTokens == nil {
+		cached := a.CachedTokens
+		c.CachedTokens = &cached
+	}
 }
 
 // chatAnswer is the part of a chat completion the telemetry reads.

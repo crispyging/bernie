@@ -13,7 +13,8 @@ func (s *Server) metrics(w http.ResponseWriter) {
 	s.mu.Lock()
 	running, gen := s.running, s.genTotal
 	prompt, cached, queries, hits := s.prompt, s.cached, s.queries, s.hits
-	finished := make(map[string]int, len(s.finished))
+	// vLLM publishes request_success_total from the start, at zero.
+	finished := map[string]int{"length": 0, "stop": 0}
 	for k, v := range s.finished {
 		finished[k] = v
 	}
@@ -41,6 +42,33 @@ func (s *Server) metrics(w http.ResponseWriter) {
 	fmt.Fprintf(w, "vllm:generation_tokens_total{engine=\"0\",model_name=\"%s\"} %d\n", m, gen)
 	for _, reason := range sortedKeys(finished) {
 		fmt.Fprintf(w, "vllm:request_success_total{engine=\"0\",finished_reason=\"%s\",model_name=\"%s\"} %d\n", reason, m, finished[reason])
+	}
+	// The per-request counters vLLM publishes since 0.10: their counts are
+	// the finished requests, their sums the tokens and the seconds.
+	done := 0
+	for _, n := range finished {
+		done += n
+	}
+	var prefillS, e2eS float64
+	for _, v := range ttft {
+		prefillS += v
+	}
+	for _, v := range e2e {
+		e2eS += v
+	}
+	fmt.Fprintf(w, "process_start_time_seconds 1.7e+09\n")
+	for _, c := range []struct {
+		name string
+		sum  float64
+	}{
+		{"request_prompt_tokens", float64(prompt)},
+		{"request_generation_tokens", float64(gen)},
+		{"request_prefill_kv_computed_tokens", float64(prompt - cached)},
+		{"request_prefill_time_seconds", prefillS},
+		{"request_decode_time_seconds", max(0, e2eS-prefillS)},
+	} {
+		fmt.Fprintf(w, "vllm:%s_count{engine=\"0\",model_name=\"%s\"} %d\n", c.name, m, done)
+		fmt.Fprintf(w, "vllm:%s_sum{engine=\"0\",model_name=\"%s\"} %g\n", c.name, m, c.sum)
 	}
 	writeHistogram(w, "vllm:time_to_first_token_seconds", m, ttft)
 	writeHistogram(w, "vllm:inter_token_latency_seconds", m, itl)

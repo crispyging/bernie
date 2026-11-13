@@ -282,7 +282,11 @@ func converse(ctx context.Context, cl *client, o Options, model string, c *Case,
 		msgs = append(msgs, m)
 	}
 	for steps := 0; ; steps++ {
+		before := cl.counters(ctx, model, nil, 2*time.Second)
 		msg, call, err := cl.chat(ctx, model, msgs, c.Tools(), o)
+		if err == nil && before != nil {
+			call.credit(before, cl.counters(ctx, model, before, 5*time.Second))
+		}
 		u = append(u, call)
 		if err != nil {
 			return "", events, u, err

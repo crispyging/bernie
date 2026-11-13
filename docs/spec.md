@@ -1696,7 +1696,8 @@ Cell fields:
 | `mean_prompt_tokens`, `mean_output_tokens`, `mean_cached_prompt_tokens`, `tokens_per_chunk` | Real sizes seen. |
 | `duration_s`, `errors` | Wall time; sample of error strings. |
 | `recall` | Pass key check of the cell: `asked`, `passed`, `depth`, `method`. Absent when the check did not run. |
-| `probe` | The prefill probe of the cell (below): `requests`, `completed`, `wall_s`, `prompt_tokens`, `cached_tokens`, `agg_tok_s`, `ttft_s` and `unavailable`. Absent when the run sent no probe. |
+| `probe` | The prefill probe of the cell (below): `requests`, `completed`, `wall_s`, `prompt_tokens`, `cached_tokens`, `agg_tok_s`, `source`, `ttft_s`, `unavailable`, and `server` or `server_unavailable` (the counter attribution below). Absent when the run sent no probe. |
+| `server_batch`, `server_batch_unavailable` | What vLLM's own counters say about the measured requests of the cell: `requests`, `prefill_tok_s` and `decode_tok_s` per request, `prefill_s`, `decode_s`, `computed_prompt_tokens`, `cached_tokens`, `source` (`vllm_metrics`) and `raw_metrics_delta`; or why they cannot be credited to the cell. |
 | `check` | The declared-answer verdict of the cell: `asked`, `passed`, `method`. It is separate from `recall`, so a group of kind `check` stays distinguishable in one result. Absent when the check did not run. |
 | `group`, `input_len`, `output_len` | The suite group of the cell and the lens of that group. Absent in a plain run. |
 | `kind` | What the cell asserts: `throughput` (a speed) or `check` (a declared answer). Absent in a plain run. |
@@ -1724,6 +1725,30 @@ failed request, or without token usage, has no rate: `unavailable` says
 why, and the dashboard shows it under the cell. The probe requests are not
 counted in the cell. The repetitions of a suite cell merge into the median
 rate of the probes that measured one.
+
+Counter attribution is BroodBench's metrics capture. vLLM 0.10 and later
+publish per-request counters per model: `request_success_total`, the
+running and waiting gauges, and the count and the sum of
+`request_prompt_tokens`, `request_generation_tokens`,
+`request_prefill_time_seconds`, `request_decode_time_seconds` and
+`request_prefill_kv_computed_tokens`, next to `process_start_time_seconds`.
+Before and after a probe wave, and before and after the measured requests
+of a cell, bernie waits up to 15 s for the model to have no running or
+waiting request and, after the wave, for the server to count it. It
+credits the difference to the wave only when the server was idle at both
+moments, the process and the engine did not change, no counter went down,
+every count went up by exactly the requests of the wave, and the prompt
+and generation sums equal the client's usage. Then the prefill rate per
+request is the computed prompt tokens over the prefill seconds, the decode
+rate the generated tokens less one a request over the decode seconds, and
+the probe's `agg_tok_s` becomes the computed prompt tokens over the wall
+time of the wave with `source` `vllm_metrics`. Otherwise the reason says
+why (no metrics, other traffic, a restart, a failed request, a count or a
+token mismatch), and the probe keeps the client's usage
+(`client_usage`). The dashboard shows the server's rates next to the
+client's in the table and the reasons under the cell, without flagging it.
+The repetitions of a suite cell merge into the median rates; one refused
+repetition refuses the cell.
 
 The gates name why a number may not be a speed number. A cell that is off
 size, degenerate or buffered keeps its numbers visible, because hiding a
@@ -2049,7 +2074,14 @@ usage (`prompt_tokens`, `completion_tokens`, `cached_tokens` from
 (`prompt_n`, `prompt_ms`, `predicted_n`, `predicted_ms` in `timings`,
 `timing` or the usage, as llama.cpp does), `evaluated_prompt_tokens`,
 `prefill_tok_s`, `prefill_s`, `decode_tok_s` and `decode_s` with
-`prefill_source` and `decode_source` `server_timings`. The requests are
+`prefill_source` and `decode_source` `server_timings`. For an `openai`
+server bernie also reads vLLM's per-request counters before (up to 2 s for
+the server to be idle) and after (up to 5 s) every request, and credits
+them to that request alone under the rules of §10.1 with one request: then
+a rate the answer did not carry comes from the counters with the source
+`vllm_isolated_metrics`, and `cached_tokens` from the computed tokens. A
+call whose counters cannot be credited says why in
+`metrics_unavailable`. The requests are
 not streamed, so there is no time to first token, and a rate the server
 did not report is absent. A failed request keeps its `error`. The summary
 of a model has `performance`: `calls`, `truncated`, `mean_latency_s`, the
