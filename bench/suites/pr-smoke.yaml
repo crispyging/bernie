@@ -1,0 +1,74 @@
+# The PR smoke suite of BroodBench: a fixed load matrix for comparing vLLM
+# fork pull requests. The same cells run on every build, so two results line
+# up row for row: up to 16K at 1 and 8 requests in flight, then up to 128K at
+# 1 and 4. A group that does not fit the server's max-model-len is skipped
+# with the reason, never sent. Run it with prefix caching off.
+# See docs/spec.md §10.2.
+schema: 1
+id: pr-smoke
+name: PR smoke
+description: >-
+  The fixed BroodBench PR smoke matrix: 2K to 16K at c1 and c8, 32K to
+  128K at c1 and c4, 256 output tokens, 16 requests a cell.
+reps: 1
+warmup: 1
+seed: 42
+recall: false
+request_timeout_s: 1800
+cooldown_s: 0
+size_tolerance_percent: 2
+defaults:
+  requests: 16
+compare:
+  band: 0.05
+  steady: 0.95
+groups:
+  - name: 2k
+    kind: throughput
+    input_len: 2048
+    output_len: 256
+    concurrency: [1, 8]
+    reps: 1
+    est_s: 40
+  - name: 4k
+    kind: throughput
+    input_len: 4096
+    output_len: 256
+    concurrency: [1, 8]
+    reps: 1
+    est_s: 50
+  - name: 8k
+    kind: throughput
+    input_len: 8192
+    output_len: 256
+    concurrency: [1, 8]
+    reps: 1
+    est_s: 70
+  - name: 16k
+    kind: throughput
+    input_len: 16384
+    output_len: 256
+    concurrency: [1, 8]
+    reps: 1
+    est_s: 110
+  - name: 32k
+    kind: throughput
+    input_len: 32768
+    output_len: 256
+    concurrency: [1, 4]
+    reps: 1
+    est_s: 200
+  - name: 64k
+    kind: throughput
+    input_len: 65536
+    output_len: 256
+    concurrency: [1, 4]
+    reps: 1
+    est_s: 400
+  - name: 128k
+    kind: throughput
+    input_len: 131072
+    output_len: 256
+    concurrency: [1, 4]
+    reps: 1
+    est_s: 900

@@ -27,8 +27,14 @@ func Run(ctx context.Context, s *Suite, o bench.Options, progress io.Writer) (*b
 	o = applyOverrides(s, o)
 	var merged *bench.Result
 	var cells []bench.Cell
+	limit := contextLimit(ctx, o)
 	for gi, g := range s.Groups {
 		bench.SendEvent(progress, bench.Event{Kind: bench.EventGroup, Group: g.Name, Index: gi + 1, Total: len(s.Groups)})
+		if reason := skipReason(g, limit); reason != "" {
+			fmt.Fprintf(progress, "bench: suite %s group %s: skipped: %s\n", s.ID, g.Name, reason)
+			cells = append(cells, skippedCells(g, reason)...)
+			continue
+		}
 		fmt.Fprintf(progress, "bench: suite %s group %s: %d prompt tokens, %d output tokens, c=%v, %d repetition(s)\n",
 			s.ID, g.Name, g.InputLen, g.OutputLen, g.Concurrency, g.Reps)
 		reps, first, err := runGroup(ctx, s, g, o, progress)
@@ -39,6 +45,9 @@ func Run(ctx context.Context, s *Suite, o bench.Options, progress io.Writer) (*b
 			merged = first
 		}
 		cells = append(cells, groupCells(g, reps)...)
+	}
+	if merged == nil && len(cells) > 0 {
+		return nil, fmt.Errorf("no group of the suite %s fits the server: %s", s.ID, cells[0].Skipped)
 	}
 	if merged == nil {
 		return nil, fmt.Errorf("the suite %s has no groups", s.ID)

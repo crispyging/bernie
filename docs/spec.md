@@ -1700,6 +1700,7 @@ Cell fields:
 | `reps` | The repetitions of the cell. Each entry holds the numbers of one repetition. |
 | `spread` | The min/max ratio of the metrics over the repetitions. |
 | `incomplete` | True when the cell lost a warm-up or a repetition. Its numbers stay visible, but no verdict is issued for it. |
+| `skipped` | Why the cell was never sent: its prompt and output do not fit the server's context ([§10.2](#102-suites)). Absent for a cell that ran. |
 | `warmup_failed` | The number of warm-up requests that failed. |
 | `size_valid`, `input_size_percent` | The drift of the measured prompt length and whether it stays inside the tolerance of the run (2 % by default). |
 | `output_valid` | False when the replies of the cell are degenerate: fewer than 8 % distinct words. |
@@ -1800,6 +1801,11 @@ suite has one short cell: it proves that the server answers. The built-in
 16384 tokens, at the level 1. It shows how the prefill and the time to
 first token grow with the prompt, and the dashboard draws it as the length
 curve.
+The built-in `pr-smoke` suite is the fixed PR smoke matrix of BroodBench:
+2048, 4096, 8192 and 16384 prompt tokens at the levels 1 and 8, then 32768,
+65536 and 131072 at the levels 1 and 4, 256 output tokens and 16 requests a
+cell. The cells are the same on every build, so two results line up row
+for row.
 
 The digest of a suite is the sha256 of its canonical form. Every result of
 a suite run carries the digest, so two runs of different suites are never
@@ -1824,6 +1830,14 @@ measure the same work.
 A cell is `incomplete` when a warm-up request failed or a repetition lost a
 request. The numbers of an incomplete cell stay visible, because a hidden
 cell is worse than a labelled one, but no verdict is issued for it.
+
+Before the first group, a suite run reads `max_model_len` of the model from
+the models list of the server (vLLM). A group whose prompt, output and 256
+template tokens do not fit is never sent: its cells carry `skipped` with the
+reason, for example `65536 prompt + 256 output + 256 template tokens exceed
+the server's max-model-len 32768`, and no numbers. The progress log says
+so. A comparison passes over a skipped cell: it is not a lost request. A
+suite with no group that fits fails before it sends anything.
 
 The fingerprint of a result records the power cap and the clocks of the
 cards of the run, when the host publishes them. They say what the cards

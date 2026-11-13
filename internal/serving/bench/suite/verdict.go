@@ -114,6 +114,11 @@ func Judge(cmp *Comparison, band float64) *Verdict {
 			v.invalid(fmt.Sprintf("the run %s has no cell %s", cmp.B.ID, CellLabel(ca.Group, ca.Concurrency)))
 			continue
 		}
+		if ca.Skipped != "" || cb.Skipped != "" {
+			// A cell that did not fit the context of a server has no
+			// numbers to compare; it is not a lost request.
+			continue
+		}
 		cv := CellVerdict{Group: ca.Group, Concurrency: ca.Concurrency}
 		for _, m := range Metrics {
 			mv := judge(m, ca, cb, band, steady)

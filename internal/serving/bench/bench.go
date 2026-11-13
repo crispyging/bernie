@@ -139,6 +139,9 @@ type Cell struct {
 	// Incomplete marks a cell that lost a warm-up or a repetition. Its
 	// numbers stay visible, but no verdict is issued for it.
 	Incomplete bool `json:"incomplete,omitempty"`
+	// Skipped says why a cell was never sent: its prompt and output do
+	// not fit the context of the server (spec §10.2). It has no numbers.
+	Skipped string `json:"skipped,omitempty"`
 	// InputSizePercent is the share of the prompt length the server
 	// measured off the requested length. SizeValid tells whether the
 	// drift stays inside the tolerance of the run.

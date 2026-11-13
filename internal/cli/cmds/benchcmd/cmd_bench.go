@@ -136,6 +136,10 @@ func printBenchResult(w io.Writer, r *bench.Result) {
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, metricHelp)
 	for _, cl := range r.Cells {
+		if cl.Skipped != "" {
+			fmt.Fprintf(w, "cell %s skipped: %s\n", suite.CellLabel(cl.Group, cl.Concurrency), cl.Skipped)
+			continue
+		}
 		printCell(w, &cl)
 		for _, e := range cl.Errors {
 			fmt.Fprintf(w, "%s error: %s\n", suite.CellLabel(cl.Group, cl.Concurrency), e)
