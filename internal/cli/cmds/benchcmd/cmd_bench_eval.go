@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
+	"slices"
 	"strconv"
 	"strings"
 	"text/tabwriter"
@@ -149,6 +151,9 @@ func printEvalResult(w io.Writer, r *eval.Result) {
 		for _, b := range s.ByContext {
 			fmt.Fprintf(tw, "  context %s\t%d/%d\t%s\n", b.Key, b.Passed, b.Graded, pct(b.Accuracy))
 		}
+		for _, k := range slices.Sorted(maps.Keys(s.FailureCategories)) {
+			fmt.Fprintf(tw, "  failure %s\t%d\t\n", k, s.FailureCategories[k])
+		}
 		tw.Flush()
 	}
 	first := true
@@ -163,6 +168,9 @@ func printEvalResult(w io.Writer, r *eval.Result) {
 		reason := cr.Error
 		if reason == "" && cr.Expected.Answer != nil {
 			reason = fmt.Sprintf("expected %q, got %q", *cr.Expected.Answer, strings.TrimSpace(cr.Reply))
+		}
+		if cr.Diagnosis != nil {
+			reason = cr.Diagnosis.Title + ": " + reason
 		}
 		fmt.Fprintf(w, "  %s %s ctx %d rep %d: %s %s\n", cr.Model, cr.CaseID, cr.Context, cr.Repeat, cr.Status, reason)
 	}

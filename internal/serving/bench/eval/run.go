@@ -124,6 +124,8 @@ type CaseResult struct {
 	// Admission is how the case was fitted to the server. It is absent
 	// when the server has neither a tokenizer nor a reported limit.
 	Admission *Admission `json:"context_admission,omitempty"`
+	// Diagnosis explains the outcome from the recorded evidence.
+	Diagnosis *Diagnosis `json:"diagnosis,omitempty"`
 }
 
 // Run asks every model every case, one request at a time, and grades the

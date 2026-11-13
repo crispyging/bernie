@@ -55,6 +55,10 @@ type ModelSummary struct {
 	Loops            int      `json:"loops"`
 	ByTrack          []Bucket `json:"by_track"`
 	ByContext        []Bucket `json:"by_context"`
+	// FailureCategories counts the diagnosis categories of the cases that
+	// did not pass; FailureFamilies counts their scenario families.
+	FailureCategories map[string]int `json:"failure_categories"`
+	FailureFamilies   map[string]int `json:"failure_families"`
 }
 
 func newResult(o Options, base string) *Result {
@@ -65,11 +69,23 @@ func newResult(o Options, base string) *Result {
 		Version: Version, URL: base, Time: now, Options: o, Cases: []CaseResult{}}
 }
 
-// finish computes the summary of every model.
+// finish diagnoses every case and computes the summary of every model. It
+// runs on every save and every read, so a result saved before the
+// diagnoses existed has them too.
 func (r *Result) finish() {
 	r.Summary = nil
+	for i := range r.Cases {
+		r.Cases[i].Diagnosis = Diagnose(&r.Cases[i])
+	}
 	for _, m := range r.Options.Models {
 		s := ModelSummary{Model: m}
+		var mine []CaseResult
+		for _, c := range r.Cases {
+			if c.Model == m {
+				mine = append(mine, c)
+			}
+		}
+		s.FailureCategories, s.FailureFamilies = FailureCounts(mine)
 		tracks, sizes := map[string]*Bucket{}, map[string]*Bucket{}
 		tokens, tokensKnown, latency := 0, true, 0.0
 		for _, c := range r.Cases {
@@ -174,6 +190,7 @@ func Get(id string) (*Result, error) {
 	if err := json.Unmarshal(b, &r); err != nil {
 		return nil, fmt.Errorf("eval result %s: %w", id, err)
 	}
+	r.finish()
 	return &r, nil
 }
 
