@@ -101,9 +101,9 @@ Regenerate the table rows with `scripts/check-web.sh --print-globals`.
 | `dashboard/web/components/cards.js` | `jsonLink`, `cardHead`, `stateHead`, `setHead`, `factRow`, `tableHead`, `tableCaption`, `emptyState`, `sectionLabel`, `PILL_ICON`, `statePill`, `loading`, `failed` |
 | `dashboard/web/components/charts.js` | `chartMinMax`, `chartNumbers`, `chartSame`, `chartPaths`, `chartPointer`, `chartNice`, `sparkDomain`, `chartDataTable`, `spark`, `areaChart` |
 | `dashboard/web/components/command.js` | `copyBtn`, `cmdBlock`, `connectEndpoint`, `connectSnippet` |
-| `dashboard/web/components/compare.js` | `NO_VERDICT`, `svgEl`, `ladderPoints`, `compareCellName`, `compareSpread`, `compareBandText`, `compareSpreadText`, `compareChipText`, `compareChipWidth`, `compareChip`, `compareBlock`, `compareScale`, `compareTable`, `compareChart`, `curveSmallMultiples`, `curveTable` |
+| `dashboard/web/components/compare.js` | `NO_VERDICT`, `svgEl`, `compareCellName`, `compareSpread`, `compareBandText`, `compareSpreadText`, `compareChipText`, `compareChipWidth`, `compareChip`, `compareBlock`, `compareScale`, `compareTable`, `compareChart` |
 | `dashboard/web/components/gputable.js` | `gpuValueTable` |
-| `dashboard/web/components/metrics.js` | `METRIC_HELP`, `VERDICTS`, `METRIC_COLS`, `COMPARE_METRICS`, `benchNum`, `benchDist`, `benchRate`, `benchDigits`, `SPREAD_STEADY`, `benchSpreadText`, `cellLens`, `cellFlags`, `metricHead`, `cellRow`, `cellsTable`, `verdictChip` |
+| `dashboard/web/components/metrics.js` | `METRIC_HELP`, `VERDICTS`, `COMPARE_METRICS`, `benchNum`, `benchDigits`, `SPREAD_STEADY`, `cellFlags`, `verdictChip` |
 | `dashboard/web/components/timeline.js` | `TIMELINE_STATE_WORD`, `TIMELINE_MARK`, `TIMELINE_PILL`, `stepTimeline`, `stepCurrentID`, `stepRow`, `stepPill`, `stepMark`, `stepSummary`, `stepActionLabel`, `stepAction`, `stepProgressNode`, `stepBar`, `stepProblem`, `stepToggleLog` |
 | `dashboard/web/js/boot.js` | `VIEWS`, `OLD_ROUTES`, `TAB_SCRIPTS`, `TAB_CSS`, `tabReady`, `tabLoading`, `loadScript`, `loadStyle`, `openTab`, `parseHash`, `route`, `preparePanel`, `focusSection`, `tabsKey`, `pendingG`, `shortcutsKey`, `boot` |
 | `dashboard/web/js/core.js` | `h`, `add`, `put`, `$`, `GiB`, `bytes`, `num`, `ago`, `badge`, `sh`, `SVG_NS`, `chartSvg` |
@@ -117,7 +117,8 @@ Regenerate the table rows with `scripts/check-web.sh --print-globals`.
 | `dashboard/web/views/advanced/prefs.js` | `advPrefsCard`, `prefsList`, `prefRow`, `setResolved`, `savePref` |
 | `dashboard/web/views/advanced/report.js` | `advReportCard`, `advReportText`, `advCopyReport`, `advDownloadReport` |
 | `dashboard/web/views/advanced/power.js` | `advPowerCard`, `advPaintPower`, `advPowerRow`, `advSavePower` |
-| `dashboard/web/views/benchmark/benchmark.js` | `benchState`, `benchSection`, `benchFailed`, `benchResults`, `benchSuiteLine`, `benchCards`, `benchCellName`, `benchBestCell`, `benchHeadline`, `benchResultBody`, `benchCopy`, `benchReceipt`, `benchStartError`, `cancelBench`, `deleteBenchResult`, `viewBenchmark` |
+| `dashboard/web/views/benchmark/benchmark.js` | `benchState`, `benchSection`, `benchFailed`, `benchResults`, `benchSuiteLine`, `benchHeadline`, `benchCopy`, `benchReceipt`, `benchStartError`, `cancelBench`, `deleteBenchResult`, `viewBenchmark` |
+| `dashboard/web/views/benchmark/report.js` | `benchCtx`, `benchCtxName`, `benchRefName`, `benchKpis`, `BENCH_CHARTS`, `benchGrid`, `benchChart`, `benchCharts`, `benchCellState`, `BENCH_COLS`, `benchRow`, `benchMatrix`, `benchReport` |
 | `dashboard/web/views/benchmark/suites.js` | `benchSuiteCells`, `benchSuiteEstS`, `benchMinutes`, `benchSuiteCard`, `benchSuiteCards`, `benchSentence`, `benchProgress`, `benchBest`, `benchSuiteOf`, `benchHistoryRow`, `benchHistory`, `benchAB`, `benchAdvanced` |
 | `dashboard/web/views/chat/chat.js` | `chatState`, `viewChat` |
 | `dashboard/web/views/dashboard/dashboard.js` | `dash`, `dashGroup`, `dashAgg`, `dashPickRun`, `dashSection`, `dashInfo`, `dashPush`, `dashSeries`, `dashLiveRun`, `dashRunStatus`, `dashPhase`, `dashLoad`, `dashUpdateSimple`, `dashHistory`, `dashWindowSeries`, `viewDashboard`, `dashSample` |
@@ -326,15 +327,17 @@ model, and follows the log of that run. The Setup tab shows the same
 state in words.
 
 The Benchmark tab answers one question: how fast is the server, and does it
-read the whole prompt? It opens with the last result in one sentence, then
-the suites as radio cards with their digest, the table of the cells (the
-prefill and the decode speed, the time to the first token, the latency
-between the tokens and the output rate, each with the mean, the median and
-the 95th percentile), the curve of the prompt length, the comparison of two
-results with a verdict on every group, the receipt of that comparison and
-the history of the saved results. A number that was not measured shows `–`.
-When the server has a `/metrics` endpoint, a line under the table says what
-the server measured over the same requests. `Run the suite` starts the run
+read the whole prompt? It opens with the peak of the last result in one
+sentence, then the suites as radio cards with their digest. The result
+follows the BroodBench report: four headline cards from the `summary` of the
+result (peak output, single-stream decode, prefill at c=1, requests ok), three
+charts by context (output tok/s, aggregate prefill, TTFT p50, one line per
+in-flight level; a result of one context puts the levels along x), and the
+context × in-flight table. A failed, incomplete, skipped or flagged cell has a
+`Why` button that opens its reasons: the skip reason, the error samples, the
+lost warm-ups and the flags. Then come the comparison of two results with a
+verdict on every group, the receipt of that comparison and the history of the
+saved results. A number that was not measured shows `–`. `Run the suite` starts the run
 and the card under the suites follows it: the phase, the rate and the time.
 The A/B section measures one server, then the other, then the first again.
 

@@ -156,7 +156,7 @@ Every item of this group has shipped.
   `bernie bench ab`. Spec [§10.3](spec.md#103-the-verdict).
 - **Bench suites in the dashboard.** The Bench tab runs a suite, shows the
   five metric groups of every cell, compares a result with a saved one and
-  draws the context-length curve of a ladder suite as plain SVG. Spec
+  draws three charts by context as plain SVG. Spec
   [§11](spec.md#11-dashboard).
 - **Check groups.** A suite group of kind `check` asserts a declared answer
   instead of a speed. Its verdict lands in the cell field `check`, separate
@@ -164,7 +164,7 @@ Every item of this group has shipped.
 - **Long-context ladder.** The built-in `long-context` suite measures one
   cell per prompt length, from 2048 to 16384 tokens. It shows how the
   prefill and the time to first token grow with the prompt, and the
-  dashboard draws it as the length curve. Spec
+  dashboard draws it in its charts by context. Spec
   [§10.2](spec.md#102-suites).
 
 - **Dashboard structure.** The dashboard is one server package plus the

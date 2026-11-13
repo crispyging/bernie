@@ -294,8 +294,8 @@ are `design/state-headline.svg`, `design/button-primary.svg`,
 The shared JavaScript keeps its parts in `dashboard/web/components/`:
 `command.js` (the command block and the copy button), `cards.js` (the card
 head, the state headline, the empty and the failed state), `charts.js` (the
-sparkline, the area chart, the ring, the meter), `metrics.js` (the metric
-table, the verdict chip, the bar comparison, the length curve) and
+sparkline, the area chart, the ring, the meter), `metrics.js` (the words
+of the metrics, the flags and the verdict chip) and
 `timeline.js` (the step row). A worker who needs a new part puts it in the
 file of its role and tells the other workers.
 
@@ -441,10 +441,10 @@ KB below means 1024 bytes. These are payload sizes, not page-load timings.
 
 | Budget | Target | Measured | Note |
 |---|---|---|---|
-| The whole page (HTML + CSS + JS, uncompressed) | ≤ 436 KB | **435.2 KB** | the whole tree; raised from 432 KB for the attach form and the grouping of chart points |
+| The whole page (HTML + CSS + JS, uncompressed) | ≤ 436 KB | **432.8 KB** | the whole tree; raised from 432 KB for the attach form and the grouping of chart points |
 | HTML | ≤ 12 KB | **6.6 KB** | `index.html` |
-| CSS | ≤ 80 KB | **78.0 KB** | shared styles plus lazy tab styles; obsolete dashboard rules removed |
-| JavaScript | ≤ 352 KB | **350.6 KB** | plain and unminified; raised from 348 KB for the attach form and the grouping of chart points |
+| CSS | ≤ 80 KB | **78.3 KB** | shared styles plus lazy tab styles; obsolete dashboard rules removed |
+| JavaScript | ≤ 352 KB | **348.1 KB** | plain and unminified; raised from 348 KB for the attach form and the grouping of chart points |
 | JavaScript on the first paint | ≤ 112 KB | **103.0 KB** | the shell and Setup; chooser and path runner load on demand |
 | CSS on the first paint | ≤ 40 KB | **38.6 KB** | the five initial stylesheets |
 | Fonts | ≤ 130 KB, four woff2, OFL, `font-display: swap`, `unicode-range` | **128.4 KB**, four woff2, swap ✓, range ✓ | the license texts (24.5 KB) sit next to the files; they are not loaded by the page |
@@ -509,7 +509,7 @@ every open page, so ten open tabs cost the same as one (spec §11).
 | Recipes (`#recipes`) | Setup | the recipe list, the fit, the plan, the settings with their reasons, the mode switch |
 | Runs (`#runs`) | Dashboard | the run card: state, phase, endpoint, uptime, stop, restart, the findings of the log doctor |
 | Runs, the log | Logs | the live tail, the filter, the findings, the download |
-| Bench (`#bench`) | Benchmark | the suites, the run, the results, the comparison, the length curve, the history |
+| Bench (`#bench`) | Benchmark | the suites, the run, the results, the comparison, the charts by context, the history |
 
 ### 9.2 The commit plan
 

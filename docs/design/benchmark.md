@@ -31,19 +31,18 @@ Wireframes: `design/benchmark-1280.svg` (a result and a comparison),
 | 3 | The digest of a suite | the same document, `digest` | with the card | the card shows `digest: unknown` | the card shows `digest: unknown` |
 | 4 | The primary action `Run the suite` | `POST /api/bench/run` with the suite id (G7) | on demand | the button is disabled when no suite is picked | the button is disabled and reads `Try again` |
 | 5 | The live progress of the run | `GET /api/bench/{id}` → `phase`, `done`, `total` and `GET /api/bench/{id}/events` (G7) | the job stream | the progress card is hidden | the progress card says `The run stopped.` and shows the last line |
-| 6 | The table of the cells | `GET /api/bench` → `results[].cells[]` | on open and after a run | `No result yet.` and `Run a suite above to fill this table.` | `The result could not be read.` plus `Try again` |
+| 6a | The headline cards | `GET /api/bench` → `results[].summary` | on open and after a run | every card shows `–` | `The results could not be read.` plus `Try again` |
+| 6 | The context × in-flight table | `GET /api/bench` → `results[].cells[]` | on open and after a run | `No result yet.` and `Run a suite above and its numbers show here.` | `The results could not be read.` plus `Try again` |
 | 7 | The five metric groups of a cell | the cell: `prefill`, `decode`, `ttft_s`, `itl_ms`, `output_tok_s` | with the table | `–` | `–` |
-| 8 | The distribution of a metric | the same fields, `p50`, `p95`, `max` | with the table | `–` | `–` |
+| 8 | The distribution of a metric | the same fields, `p50` and `p95` | with the table | `–` | `–` |
 | 8b | The requests behind a distribution | the cell, `completed` | with the table | `–` | `–` |
-| 8c | The spread of the repetitions | the cell, `spread` and `reps` | with the table | the number carries no spread | the number carries no spread |
-| 9 | The server numbers of a cell | the cell, `server_side` | with the table | the column is hidden and the row says `the server does not publish its metrics` | the column is hidden |
-| 10 | The flags of a cell | the cell: `recall`, `check`, `size_valid`, `output_valid`, `stream_incremental`, `incomplete`, `spread` | with the table | the row has no flag | the row has no flag |
+| 10 | The state and the reasons of a cell | the cell: `skipped`, `failed`, `errors`, `warmup_failed`, `incomplete`, and the flags `recall`, `check`, `size_valid`, `output_valid`, `stream_incremental`, `spread` | with the table | the state is `ok` and there is no `Why` button | the state is `ok` |
 | 11 | The comparison chart | `GET /api/bench/compare?a=ID&b=ID` → the cells and the verdicts | on demand | the section says `Pick two results to compare.` | `The two results measured different things.` and the reason |
 | 11b | The block of one cell | the same document, one block per cell (group and concurrency) | with the chart | no block | no block |
 | 11c | The change in percent | the same document, `delta_pct` | with the chart | `–` | `–` |
 | 12 | The verdict chips | the same document, the verdict of every metric, its `band` and the spread of the cell | with the chart | `–` | `–` |
-| 13 | The length curve | the cells of a ladder suite, `input_len` and `prefill`/`ttft_s` | with the result | the section says `This suite has no ladder. Run the long-context suite to see the curve.` | `The curve could not be drawn.` plus `Try again` |
-| 13b | The numbers of a chart | the same numbers as the chart, in a table under it | with the chart | the details is closed | the details is closed |
+| 13 | The three charts by context | the cells that ran: `input_len`, `concurrency`, `output_tok_s`, `prefill.agg_tok_s`, `ttft_s.p50` | with the result | no chart when no cell ran | no chart |
+| 13b | The numbers of a chart | the context × in-flight table under the charts | with the chart | `–` | `–` |
 | 14 | The history table | `GET /api/bench` → the saved results | on open and after a run | `No saved result yet.` and `Every benchmark is saved with its workload, so two results can be compared only when they measured the same thing.` | `The history could not be read.` plus `Try again` |
 | 15 | The compare-to-baseline picker | the same document | on open | the picker is disabled | the picker is disabled |
 | 16 | The receipt | `GET /api/bench/compare?a=ID&b=ID&format=markdown` (G11) | on demand | the button is disabled | the button is disabled |
@@ -204,5 +203,6 @@ charts. The differences:
 | The table shows no spread | every number that came from the repetitions carries their spread under it | a gain inside the noise is not a gain |
 | The comparison is one cluster per metric group | the comparison is one block per cell, and the bars of every block are indexed to the baseline on one scale | comparing a metric of one cell with a metric of another cell measures the cells, not the runs |
 | The comparison chip holds the word | the chip holds the word, the band it used and the spread | a verdict without its band cannot be judged |
-| The length curve has two axes and two lines | the curve is two charts stacked, one measure each, sharing the log x-axis | two axes with their own maxima invite a correlation the data does not have |
-| The charts have no text form | every chart has the same numbers in a table under it, in a `details` | the numbers have to exist as text |
+| The length curve has two axes and two lines | three charts side by side, one measure each, the contexts along x | two axes with their own maxima invite a correlation the data does not have |
+| The charts have no text form | the table under the charts holds every number of every chart | the numbers have to exist as text |
+| A failed or skipped cell shows only a flag | the cell has a state word and a `Why` button that opens its reasons | a reader who sees `failed` asks why; the answer sits next to it |

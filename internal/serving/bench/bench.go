@@ -220,6 +220,9 @@ type Result struct {
 	// nil for a server bernie did not start and in older results.
 	Weights *weights.Model `json:"weights,omitempty"`
 	Cells   []Cell         `json:"cells"`
+	// Summary is the headline of the cells. Save and the readers fill it,
+	// so it is never stale.
+	Summary *Summary `json:"summary,omitempty"`
 }
 
 // Completed is the number of successful measured requests over all cells.

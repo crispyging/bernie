@@ -18,7 +18,6 @@ internal/cli/cli.go	478	open: every command of every subpackage grew since the c
 dashboard/web/css/layout.css	427	shell owner: the rail, responsive controls and small widths; the 1024 line cap holds
 internal/onboarding/steps.go	414	onboarding owner: the eight steps of the path, their commands and their fixes; the 1024 line cap holds
 dashboard/web/js/data.js	423	the shared data path: requests, streams, pause state and frame dispatch; the 1024 line cap holds
-dashboard/web/views/benchmark/benchmark.js	401	benchmark owner: the suites, the result, the comparison, the history and the A/B run; the 1024 line cap holds
 internal/onboarding/jobs.go	459	onboarding owner: the jobs, their state machine and the progress of the work; the 1024 line cap holds
 internal/setup/download.go	416	setup owner: the model download, its limit and its progress sentence; the 1024 line cap holds
 internal/doctor/doctor_test.go	414	doctor owner: the table-driven cases that walk every category and every status; the 1024 line cap holds

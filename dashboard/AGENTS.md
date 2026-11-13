@@ -350,10 +350,10 @@ for the first time (the manifest of `web/js/boot.js`).
 
 | Budget | Target | Now | Check |
 |---|---|---|---|
-| HTML + CSS + JS, uncompressed (the whole tree) | ≤ 436 KB | 435.2 KB | **[budget]** |
+| HTML + CSS + JS, uncompressed (the whole tree) | ≤ 436 KB | 432.8 KB | **[budget]** |
 | HTML file | ≤ 12 KB | 6.6 KB | **[budget]** |
-| CSS total | ≤ 80 KB | 78.0 KB | **[budget]** |
-| JavaScript total (the six tabs) | ≤ 352 KB | 350.6 KB | **[budget]** |
+| CSS total | ≤ 80 KB | 78.3 KB | **[budget]** |
+| JavaScript total (the six tabs) | ≤ 352 KB | 348.1 KB | **[budget]** |
 | JavaScript on the first paint | ≤ 112 KB | 103.0 KB | **[budget]** |
 | CSS on the first paint | ≤ 40 KB | 38.6 KB | **[budget]** |
 | Fonts | ≤ 130 KB, ≤ 4 files, woff2, `font-display:swap`, `unicode-range` | 128.4 KB, 4 files, swap, range ✓ | **[budget]** |

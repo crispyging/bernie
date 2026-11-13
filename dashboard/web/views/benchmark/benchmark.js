@@ -39,75 +39,24 @@ function benchSuiteLine(r) {
     " · version " + (r.suite.version || 1);
 }
 
-/** benchCards counts the cards a result ran on. The fingerprint names them
- *  as "2x Radeon PRO W7800, 8x RADEON PRO V620". */
-function benchCards(fp) {
-  const s = (fp && fp.gpus) || "";
-  if (!s) return null;
-  let n = 0, found = false;
-  for (const part of s.split(",")) {
-    const m = part.trim().match(/^(\d+)\s*x\s/i);
-    if (m) { n += Number(m[1]); found = true; }
-  }
-  return found ? n : null;
-}
-
-/** benchCellName names a cell: the group of the suite and the concurrency of
- *  the cell. Every number of the headline and the lede belongs to one cell. */
-function benchCellName(c) {
-  return (c.group || "–") + " at concurrency " + (c.concurrency || 0);
-}
-
-/** benchBestCell picks the cell of a result with the highest output rate.
- *  It is the cell the headline and the lede name. */
-function benchBestCell(cells) {
-  let best = null;
-  for (const c of cells || []) {
-    const v = c.output_tok_s;
-    if (v && (!best || v > best.output_tok_s)) best = c;
-  }
-  return best;
-}
-
-/** benchHeadline writes the state headline of the tab: what the last
- *  benchmark reached and what it measured. The cell the numbers belong to is
- *  named, so the number can be found in the table below. */
+/** benchHeadline writes the state headline of the tab: the peak of the
+ *  last benchmark and the cell it came from, from the summary of the
+ *  result, so the number can be found in the table below. */
 function benchHeadline(head, results) {
   const last = results && results[0];
   if (!last) {
     setHead(head, "Nothing has been measured yet.",
       "A benchmark measures the tokens per second of a running server. Run one below and this page fills with its numbers.");
-    return null;
+    return;
   }
-  const cells = last.cells || [];
-  const best = benchBestCell(cells);
-  const cards = benchCards(last.fingerprint);
-  const cellName = best ? benchCellName(best) : "the table";
-  const title = best
-    ? "The last benchmark reached " + benchNum(best.output_tok_s, 1) + " tok/s."
+  const s = last.summary || {};
+  const title = s.peak
+    ? "The last benchmark peaked at " + benchNum(s.peak_output_tok_s, 1) + " tok/s."
     : "The last benchmark has no output rate.";
-  const lede = best
-    ? "The " + benchSuiteOf(last) + " suite measured " + cells.length + " cells" +
-      (cards ? " on " + cards + " cards" : "") + ". In the cell " + cellName +
-      " the prefill was " + benchNum((best.prefill || {}).agg_tok_s, 0) + " tok/s and the decode " +
-      benchNum((best.decode || {}).agg_tok_s, 1) + " tok/s."
-    : "The " + benchSuiteOf(last) + " suite has no cell to show yet.";
+  const lede = "The " + benchSuiteOf(last) + " suite ran " + (s.cells - s.skipped || 0) + " of " + (s.cells || 0) +
+    " cells" + (s.peak ? "; the peak is " + benchRefName(s.peak) : "") + ". " +
+    (s.completed || 0) + " of " + (s.requests || 0) + " requests answered.";
   setHead(head, title, lede);
-  return best;
-}
-
-/** benchResultBody is the content of the result card: the table of the cells
- *  and the sentence that says how the numbers are measured. The mark is the
- *  cell the headline names, so its row is tagged and the caption says which
- *  row it is. */
-function benchResultBody(r, mark) {
-  if (!r) return emptyState("No result yet.", "Run a suite above to fill this table.", "bernie bench --suite smoke");
-  return h("div",
-    h("p.bench-result-title", "Result " + r.id),
-    h("p.small.muted", benchSuiteLine(r)),
-    h("p.small.muted", METRIC_HELP),
-    cellsTable(r.cells, mark),
-    mark ? h("p.bench-headline-note.small.muted", "The headline is the cell " + benchCellName(mark) + ".") : null);
 }
 
 /** benchCopy puts a text on the clipboard. The shell owns the control; the
@@ -172,7 +121,6 @@ async function viewBenchmark(root) {
   const suitesCard = h("div.card.bench-card");
   const progress = benchProgress();
   const resultCard = h("div.card.bench-card");
-  const curveCard = h("div.card.bench-card");
   const compareCard = h("div.card.bench-card");
   const historyCard = h("div.card.bench-card");
   const advanced = benchAdvanced(benchDocs);
@@ -186,7 +134,7 @@ async function viewBenchmark(root) {
 
   put(root, head,
     benchSection("The suites", suitesCard, progress.el),
-    benchSection("The result", resultCard, curveCard),
+    benchSection("The result", resultCard),
     benchSection("The comparison", h("div.card.bench-card",
       h("div.bench-pickers",
         h("label", { for: "bench-cmp-base" }, "Baseline"), base,
@@ -268,13 +216,10 @@ async function viewBenchmark(root) {
     try {
       const list = await benchResults();
       benchState.results = list;
-      const headline = benchHeadline(head, list);
+      benchHeadline(head, list);
       const pick = pickId ? list.find((r) => r.id === pickId) : (list[0] || null);
       benchState.result = pick || null;
-      put(resultCard, benchResultBody(pick, pick === list[0] ? headline : null));
-      const curve = pick ? curveSmallMultiples(pick.cells) : null;
-      put(curveCard, curve || emptyState(pick ? "This result has no ladder." : "No curve yet.",
-        "Run the long-context suite to see the curve.", "bernie bench --suite long-context"));
+      put(resultCard, benchReport(pick));
       put(historyCard, benchHistory(list, null, (r) => {
         cand.value = r.id;
         compare();

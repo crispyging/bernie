@@ -1,5 +1,5 @@
-/* ---------- Benchmark tab: the suites, the progress, the cells, the bars,
-   the length curve and the A/B run. The colours are tokens only; the shell
+/* ---------- Benchmark tab: the suites, the progress, the result, the bars
+   and the A/B run. The colours are tokens only; the shell
    of the dashboard owns the buttons, the cards, the tables and the pills. ---------- */
 
 /* ---------- the suite cards ---------- */
@@ -28,14 +28,13 @@
 .bench-table th { padding: var(--space-2) var(--space-2); white-space: nowrap; vertical-align: bottom; }
 .bench-table th small { display: block; font-weight: 600; letter-spacing: 0; text-transform: none; color: var(--muted); }
 .bench-table td { padding: var(--space-2); }
-.bench-cell { display: block; font-weight: 700; }
 .bench-lens { display: block; color: var(--muted); font-size: 11px; }
-.bench-flag { display: block; font-size: var(--small); line-height: 1.4; margin: 0 0 2px; }
-.bench-flag.ok { color: var(--ok); }
-.bench-flag.skip { color: var(--skip); }
-.bench-flag.warn { color: var(--warn); }
-.bench-flag.serious { color: var(--serious); }
-.bench-flag.fail { color: var(--fail); }
+.bench-table td.num, .bench-table td:nth-child(3) { white-space: nowrap; }
+.bench-why-btn { margin-left: var(--space-1); padding: 2px 8px; font-size: var(--small); }
+.bench-why td { background: var(--surface-2); }
+.bench-why ul { margin: 0; padding-left: var(--space-4); font-size: var(--small); line-height: 1.5; overflow-wrap: anywhere; }
+.bench-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: var(--space-3); margin: var(--space-3) 0; }
+.bench-kpis > div { border-right: 0; margin: 0; padding: 0; }
 
 /* ---------- the verdict chips: the shared pill with a tint ---------- */
 
@@ -73,9 +72,11 @@
 .chip-text.warn { fill: var(--warn); }
 .chip-text.fail { fill: var(--fail); }
 
-/* ---------- the length curve ---------- */
+/* ---------- the charts by context ---------- */
 
-.bench-curve-wrap { margin-top: var(--space-3); }
+.bench-charts { display: grid; gap: var(--space-4); grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); margin-bottom: var(--space-4); }
+.bench-chart { margin: 0; }
+.bench-chart figcaption small { color: var(--muted); }
 .bench-curve { width: 100%; height: auto; overflow: visible; }
 .bench-curve .axis { stroke: var(--border-strong); stroke-width: 1; }
 .bench-curve .axis-label { fill: var(--muted); font: 400 11px var(--font-body); }
@@ -85,8 +86,10 @@
 .curve-dot { stroke: var(--surface); stroke-width: 2; }
 .curve-dot.s1 { fill: var(--series-1); }
 .curve-dot.s2 { fill: var(--series-2); }
-.point-label { fill: var(--series-1); font: 600 10px var(--font-mono); }
-.point-label.s2 { fill: var(--series-2); }
+.curve-line.s3 { stroke: var(--series-3); stroke-dasharray: 2 3; }
+.curve-dot.s3, .key.s3 { fill: var(--series-3); background: var(--series-3); }
+.curve-line.s4 { stroke: var(--series-4); stroke-dasharray: 8 3 2 3; }
+.curve-dot.s4, .key.s4 { fill: var(--series-4); background: var(--series-4); }
 
 /* ---------- the A/B run and the Advanced panel ---------- */
 
@@ -113,13 +116,11 @@
 
 /* ---------- the spread and the headline row ---------- */
 
-.bench-spread { display: block; color: var(--warn); font-size: 11px; margin-top: 2px; }
 tr.is-headline { background: color-mix(in srgb, var(--accent) 8%, transparent); }
 tr.is-headline > td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
 .bench-headline-tag { display: inline-block; margin-top: 3px; padding: 0 6px; border-radius: var(--radius-sm);
   background: var(--accent); color: var(--on-accent); font: 800 10px/1.6 var(--font-body);
   letter-spacing: .06em; text-transform: uppercase; }
-.bench-headline-note { margin: var(--space-2) 0 0; }
 
 /* ---------- the comparison, cell by cell ---------- */
 
@@ -132,9 +133,8 @@ tr.is-headline > td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
 .bench-bars .bar-delta.fail { fill: var(--fail); }
 .bench-bars .bar-index { stroke: var(--border-strong); stroke-width: 1; stroke-dasharray: 4 4; }
 
-/* ---------- the curve: two stacked charts that share the x-axis ---------- */
+/* ---------- the grid of the charts ---------- */
 
-.bench-curve .axis-title { fill: var(--text); font: 800 11px var(--font-body); letter-spacing: .06em; text-transform: uppercase; }
 .bench-curve .grid { stroke: var(--border); stroke-width: 1; stroke-dasharray: 3 3; }
 
 /* ---------- the text fallback of every chart ---------- */

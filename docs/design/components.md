@@ -276,28 +276,20 @@ the band of the suite with the spread the arms measured.
 Data: the verdict of one metric of one cell, its band and the spread of
 the cell.
 
-## The length curve
+## The charts by context
 
-`design/length-curve.svg`
-
-The curve is two charts stacked on top of each other, and they share the
-x-axis. One measure per chart, so the two lines cannot be read as one
-curve.
+Three charts side by side, one measure each: the output rate, the aggregate
+prefill and the time to first token (p50). They replace the length curve.
 
 | Part | Rule |
 |---|---|
-| X | the prompt length in tokens, on a log scale, from 2048 to 16384; the axis is labelled once, under the lower chart |
-| Panels | the prefill in tok/s above, the time to the first token in seconds below; each panel carries its own axis label with its unit |
-| Y | every panel starts at zero and its own maximum; the ticks are numbers, the unit is in the axis label |
-| Series | `--series-1` for the prefill, `--series-2` for the time to first token |
-| Points | the first and the last point carry their number; the rest are in the table under the chart |
+| X | the contexts of the result, evenly spaced (2K, 4K, … 128K); a result of one context puts the in-flight levels along x |
+| Y | every chart starts at zero and its own maximum; the unit is in the caption |
+| Series | one line per in-flight level, `--series-1` to `--series-4`, each with its own dash pattern; one legend above the three charts names them |
+| Points | every point has a `title` with its series, its x and its number; a missing point breaks the line and is never interpolated |
 
-The curve shows how the prefill and the time to first token grow with the
-prompt. It is drawn from the cells of a ladder suite. Data: the cells of the
-`long-context` suite.
-
-Under the chart the same numbers are in a table, in a `details` element:
-`The numbers of the curve`.
+Data: the cells of the result that ran. The context × in-flight table under
+the charts holds the same numbers as text.
 
 ## The bar comparison
 

@@ -1714,6 +1714,22 @@ cell is worse than labelling it. The verdict reads them as labels, not as
 gates: only a failed recall, an incomplete cell and a missing cell stop a
 verdict.
 
+A result also has a `summary`: the headline of its cells. bernie derives it
+on every save and every read, so a result saved before the field existed
+has one too. The dashboard shows these numbers as its four headline cards.
+
+| Field | Meaning |
+|---|---|
+| `peak_output_tok_s`, `peak` | The highest `output_tok_s` of a cell that ran, and that cell: `group`, `input_len` and `concurrency`. |
+| `single_decode_tok_s` | The median per-request decode rate at concurrency 1, at the shortest context that ran at that level. |
+| `single_prefill_tok_s` | The prefill rate (`prefill.agg_tok_s`) of the same cell. It holds the queueing of the cell. |
+| `single` | That cell: `group`, `input_len` and `concurrency`. |
+| `requests`, `completed`, `failed` | The measured requests of the cells that ran: sent, answered and failed. |
+| `cells`, `skipped`, `incomplete` | Every cell, the cells never sent and the cells that lost a request. |
+
+The `input_len` of a cell in a plain run is the `--input-len` of the run.
+A field without a cell to come from is absent.
+
 A result also has a `workload`: `protocol_id`, `corpus_sha256`,
 `input_len`, `output_len`, `concurrency`, `recall` and `check`. It says what the
 benchmark asked for. Results saved before the field existed have none. A

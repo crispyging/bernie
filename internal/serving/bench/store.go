@@ -39,6 +39,7 @@ func Save(r *Result) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	r.Summary = headline(r)
 	data, err := json.MarshalIndent(r, "", "  ")
 	if err != nil {
 		return "", err
@@ -141,6 +142,7 @@ func load(path string) (*Result, error) {
 	// A result saved before the metric groups existed still shows its
 	// numbers: the old fields are converted on read.
 	r.upgrade()
+	r.Summary = headline(&r)
 	return &r, nil
 }
 

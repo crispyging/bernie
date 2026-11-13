@@ -49,6 +49,7 @@ const TAB_SCRIPTS = {
   benchmark: [
     "components/metrics.js",
     "components/compare.js",
+    "views/benchmark/report.js",
     "views/benchmark/benchmark.js",
     "views/benchmark/suites.js",
   ],
