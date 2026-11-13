@@ -7,7 +7,6 @@ import (
 	"github.com/opengfx1030/bernie/dashboard/internal/httpjson"
 	"github.com/opengfx1030/bernie/internal/app"
 	"github.com/opengfx1030/bernie/internal/onboarding"
-	"github.com/opengfx1030/bernie/internal/support/netx"
 )
 
 // smokeRequest is the body of POST /api/smoke: the prompt to send and the
@@ -36,8 +35,8 @@ func (h *handler) postSmoke(w http.ResponseWriter, r *http.Request) {
 		smokeError(w, err)
 		return
 	}
-	if !netx.Loopback(target) {
-		httpjson.Error(w, http.StatusBadRequest, "the smoke check only talks to a server of this host")
+	if !app.ServerTarget(r.Context(), target) {
+		httpjson.Error(w, http.StatusBadRequest, "the smoke check only talks to a server of this host or an attached one")
 		return
 	}
 	res, err := app.Smoke(r.Context(), app.SmokeOptions{URL: target, Model: req.Model, Prompt: req.Prompt})

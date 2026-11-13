@@ -271,7 +271,8 @@ other file, script or compose file is required.
 | `bernie smoke [--url URL] [--model NAME]` | no | Check that the running server answers: `/health`, then one chat completion of `What is 2+2? Answer with one number.` so the model applies its chat template. The answer carries the time to the first token, the number of tokens and the output speed under `--json`; the human output prints the server, the model, the answer, the verdict of the check (`ok: contains 4` or `answered`), the TTFT and the tok/s. `--url` picks the server (default: the running run). |
 | `bernie chat [--run NAME] [--max-tokens N] "PROMPT"` | no | Send one prompt to the run (default: the run that serves) and stream the answer to stdout as it comes. The reasoning of a model that sends one goes to stderr, and so does the last line: the run, the model, the time to the first token, the tokens and the tok/s. `--json` streams nothing and prints `{"run", "model", "reply", "reasoning", "ttft_ms", "output_tokens", "tok_s"}`. A run that is not `running` ([§8.3](#83-run-record)) is refused and the exit code is not 0. |
 | `bernie connect [openai\|opencode\|openwebui] [--run NAME]` | no | Print the config an app needs to use the run: the base URL (`<run URL>/v1`) and the model name, which is the first id of the server's `/v1/models`. `openai` (the default) prints the `OPENAI_*` variables and a `curl` call, `opencode` an `opencode.json` provider, `openwebui` the variables of its OpenAI connection. stdout holds only the config, so it can be redirected into a file; where it goes is a comment on stderr. `--json` prints `{"app", "run", "base_url", "model", "where", "config"}`. It writes nothing. |
-| `bernie stop [NAME]` | yes | Stop a run (the only run if NAME is absent). |
+| `bernie attach <url\|port> [--name N] [--recipe ID]` | yes | Register a vLLM server that bernie did not start, on this host or another one, as a run ([§8.4](#84-attached-servers)). |
+| `bernie stop [NAME]` | yes | Stop a run (the only run if NAME is absent). An attached run is only forgotten. |
 | `bernie logs [NAME] [-f] [--tail N]` | no | Show the log of a run. |
 | `bernie compose <id> [--set K=V]... [--mode M] [--name N] [--venv DIR] [--engine E] [--device-access A] [--profile P] [--no-tunableop] [--tuning] [-o FILE]` | no* | Write a `compose.yml` for the plan (*writes FILE only). |
 | `bernie tune tunableop list` | no | Registered TunableOp profiles. |
@@ -1412,6 +1413,31 @@ known.
 `doctor --run NAME` explains a failed start ([§5.3](#53-log-doctor)). One
 name has one run. `serve` refuses a name that is not `exited`.
 
+### 8.4 Attached servers
+
+`bernie attach` registers a vLLM server that bernie did not start as a run.
+The dashboard's Use a server that is already running form does the same
+through `POST /api/attach`.
+
+- The address is a URL (`http://chardis:8000`, `https://chardis.lan`) or a
+  port. A port means `http://127.0.0.1:PORT`.
+- The host may be another machine. Then the run shows that server: its
+  state, its metrics, Chat, the smoke check, the benchmark and the app base
+  URL all use it. The GPU readings stay those of this host, and the
+  dashboard says so.
+- bernie checks `/health`, `/metrics` and `/v1/models` first. A server that
+  fails one is refused with the reason.
+- The record has `"foreign": true`, `"model"` (the first id of
+  `/v1/models`), and `"scheme": "https"` for an https server. bernie never starts or stops the server: `stop` only forgets the
+  record, and an attached run has no log.
+- The dashboard names an attached run after its host (`chardis` for
+  `http://chardis:8000`) and `attached` for a loopback address. The CLI
+  default is `attached`.
+- Chat, the smoke check and the benchmark of the dashboard talk to a server
+  of this host or to an attached server. Any other address is refused.
+- To see the GPUs of the other machine too, run bernie there and add it to
+  the fleet (`bernie fleet add`).
+
 ## 9. Tuning
 
 ### 9.1 TunableOp
@@ -2007,6 +2033,11 @@ read-out of every card and the raw documents of `/api/telemetry`,
 `/api/hw`, `/api/runs` and `/api/gpus/history`. The history of the cards
 (`/api/gpus/history`) is read by the Dashboard tab. A number this host does
 not measure is shown as a dash with the words "n/a on this host".
+The history charts of the Dashboard tab have a `One point per` control:
+`1 s`, `5 s`, `10 s` or `15 s`. A choice above the spacing of the samples
+averages the samples of each bucket into one point, the newest bucket
+last; a bucket without a reading stays a gap. The browser keeps the choice.
+The sparklines of the last minute keep every sample.
 
 | Method | Path | Body / output |
 |---|---|---|
@@ -2019,7 +2050,8 @@ not measure is shown as a dash with the words "n/a on this host".
 | GET | `/api/recipes/{id}/plan` | `recipe plan` JSON (query `set=K=V`, repeatable; `mode`; `name`). A container plan with an image also carries `compose`: the generated `compose.yml` (ia.md §5 R42). |
 | GET | `/api/runs` | `ps` JSON. An exited run has `findings` ([§8.3](#83-run-record)); the Logs tab shows them next to its log. A live run has `phase` ([§5.4](#54-log-phase)); the Logs tab shows the sentence under its state badge. |
 | POST | `/api/runs` | `{"recipe": "", "set": ["K=V"], "mode": "", "name": ""}` → run record. A name that is already running answers 409 Conflict. |
-| DELETE | `/api/runs/{name}` | stop |
+| DELETE | `/api/runs/{name}` | stop (an attached run is only forgotten) |
+| POST | `/api/attach` | `{"url", "name", "recipe"}` → `{"run", "note"}`: attach a running server ([§8.4](#84-attached-servers)). An empty url answers 400; a server that fails a check answers 502 with the reason. |
 | GET | `/api/runs/{name}/logs?tail=N` | Server-sent events, one line per event (`tail` default 200). Ends with an `end` or `error` event. |
 | GET | `/api/runs/{name}/log?tail=2000&level=all&info&warn&error&q=text` | the tail of the log of a run: `{name, state, total_lines, truncated, lines: [{no, level, text}]}`. Every line carries its number in the log and its level. `level` is `all` (the default), `info`, `warn` or `error`; `q` is a case-insensitive substring; `tail` is 2000 lines by default. The levels are the rules of the log doctor: a line with `ERROR`, `Traceback`, `RuntimeError`, `CUDA error` or `Error:` is an error, a line with `WARNING` or `WARN` is a warning, every other line is info. A line that a finding points at is an error. |
 | GET | `/api/runs/{name}/findings` | the known failures in the log of a run: `{name, matches: [{id, severity, cause, fix, doc, line, line_no}]}`. It is the scan of `doctor --run`, with the same rules. |

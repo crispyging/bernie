@@ -113,8 +113,9 @@ func startJob(ctx context.Context, step string, action *Action) (*Job, error) {
 	jobCancelMu.Lock()
 	jobCancels[id] = cancel
 	jobCancelMu.Unlock()
+	started := *job // the caller's copy: runJob keeps writing job; GetJob reads later states
 	go runJob(runCtx, job, action, logf)
-	return job, nil
+	return &started, nil
 }
 
 // CancelJob stops the job with this id. It reports whether a running job of

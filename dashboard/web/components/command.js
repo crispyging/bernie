@@ -35,7 +35,7 @@ function connectEndpoint(run) {
   raw = raw.replace(/\/v1\/?$/, "").replace(/\/$/, "");
   raw = raw.replace("//0.0.0.0:", "//127.0.0.1:").replace("//[::]:", "//127.0.0.1:");
   const plan = run.plan || {};
-  const model = plan.served_name || plan.model || run.recipe || run.name || "";
+  const model = plan.served_name || plan.model || run.model || run.recipe || run.name || "";
   return { base: raw, url: raw ? raw + "/v1" : "", model: model };
 }
 

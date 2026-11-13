@@ -13,7 +13,23 @@ const dash = {
   tele: null,    // the last telemetry document
   live: {},      // the parts the stream repaints
   subscribed: false, // the repaint of this tab is registered on the stream
+  // seconds per point of the window charts (1 = every sample), kept per browser
+  group: (() => { try { return Number(localStorage.getItem("bernie.chart-group")) || 1; } catch (e) { return 1; } })(),
 };
+
+/** dashGroup averages points taken every interval seconds into buckets of
+ *  dash.group seconds, the newest bucket last. A bucket without a reading
+ *  stays a gap. */
+function dashGroup(values, interval) {
+  const step = Math.round(dash.group / (interval || 1));
+  if (!(step > 1)) return values;
+  const out = [];
+  for (let end = values.length; end > 0; end -= step) {
+    const got = values.slice(Math.max(0, end - step), end).filter((v) => v != null && isFinite(v));
+    out.unshift(got.length ? got.reduce((a, b) => a + b, 0) / got.length : null);
+  }
+  return out;
+}
 
 function dashSection(label, id, ...kids) {
   return h("section.section", { id: "dashboard-" + id, "data-section": id },
@@ -168,9 +184,10 @@ async function dashHistory() {
 function dashWindowSeries(key) {
   if (dash.historyOK && dash.history && dash.history.series && dash.history.series.length) {
     const field = key === "prompt" ? "prompt_tok_s" : "tokens_per_s";
-    return dash.history.series[0][field] || [];
+    return dashGroup(dash.history.series[0][field] || [], dash.history.interval_s);
   }
-  return dash.samples.slice(-300).map((s) => s.fleet ? s.fleet[key] : null);
+  // The live samples come about once a second.
+  return dashGroup(dash.samples.slice(-300).map((s) => s.fleet ? s.fleet[key] : null), 1);
 }
 
 async function viewDashboard(root) {

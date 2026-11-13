@@ -44,7 +44,7 @@ func (h *handler) postBenchRun(w http.ResponseWriter, r *http.Request) {
 		httpjson.Error(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	if err := benchTarget(o.URL); err != nil {
+	if err := benchTarget(r.Context(), o.URL); err != nil {
 		httpjson.Error(w, http.StatusBadRequest, err.Error())
 		return
 	}
@@ -82,7 +82,7 @@ func (h *handler) postBenchAB(w http.ResponseWriter, r *http.Request) {
 	}
 	for _, arm := range []string{req.Base, req.Cand} {
 		if strings.Contains(arm, "://") {
-			if err := benchTarget(arm); err != nil {
+			if err := benchTarget(r.Context(), arm); err != nil {
 				httpjson.Error(w, http.StatusBadRequest, err.Error())
 				return
 			}

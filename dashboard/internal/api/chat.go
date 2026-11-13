@@ -13,7 +13,6 @@ import (
 	"github.com/opengfx1030/bernie/dashboard/internal/sse"
 	"github.com/opengfx1030/bernie/internal/app"
 	"github.com/opengfx1030/bernie/internal/onboarding"
-	"github.com/opengfx1030/bernie/internal/support/netx"
 )
 
 const (
@@ -42,10 +41,10 @@ type chatRequest struct {
 // answer) and "error".
 //
 // The target is the run that is serving: the body names no server. Nothing
-// serves answers 503. A target that is not on this host answers 400. A
-// prompt that is empty or too long answers 400. An answer that is already
-// running answers 409. A server that does not answer answers 502 with the
-// reason.
+// serves answers 503. A target that is neither on this host nor attached
+// answers 400. A prompt that is empty or too long answers 400. An answer
+// that is already running answers 409. A server that does not answer
+// answers 502 with the reason.
 func (h *handler) postChat(w http.ResponseWriter, r *http.Request) {
 	var req chatRequest
 	if !httpjson.Decode(w, r, &req) {
@@ -69,8 +68,8 @@ func (h *handler) postChat(w http.ResponseWriter, r *http.Request) {
 		chatError(w, err)
 		return
 	}
-	if !netx.Loopback(target) {
-		httpjson.Error(w, http.StatusBadRequest, "the chat only talks to a server of this host")
+	if !app.ServerTarget(r.Context(), target) {
+		httpjson.Error(w, http.StatusBadRequest, "the chat only talks to a server of this host or an attached one")
 		return
 	}
 	// The answer lives in the context of the request: it ends when the page

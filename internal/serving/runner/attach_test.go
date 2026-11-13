@@ -54,6 +54,9 @@ func TestAttachRegistersAForeignRun(t *testing.T) {
 	if rec.Port == 0 {
 		t.Error("the port is empty")
 	}
+	if rec.Model != "m" {
+		t.Errorf("the model is %q, want the first id of /v1/models", rec.Model)
+	}
 	got, err := Get("ext")
 	if err != nil {
 		t.Fatal(err)
@@ -111,6 +114,9 @@ func TestNormalizeAttachURL(t *testing.T) {
 		{"8000", "http://127.0.0.1:8000"},
 		{"http://127.0.0.1:8000", "http://127.0.0.1:8000"},
 		{"http://localhost:8000/v1", "http://localhost:8000"},
+		{"http://chardis:8000/v1", "http://chardis:8000"},
+		{"http://10.0.0.1:8000", "http://10.0.0.1:8000"},
+		{"https://chardis.lan", "https://chardis.lan:443"},
 	}
 	for _, c := range cases {
 		got, err := normalizeAttachURL(c.in)
@@ -122,12 +128,33 @@ func TestNormalizeAttachURL(t *testing.T) {
 			t.Errorf("normalizeAttachURL(%q) = %q, want %q", c.in, got, c.want)
 		}
 	}
-	for _, bad := range []string{"", "http://10.0.0.1:8000", "ftp://127.0.0.1"} {
+	for _, bad := range []string{"", "http://:8000", "ftp://127.0.0.1"} {
 		if _, err := normalizeAttachURL(bad); err == nil {
 			t.Errorf("normalizeAttachURL(%q) was accepted", bad)
 		}
 	}
 	if p, err := urlPort("http://127.0.0.1:" + strconv.Itoa(8000)); err != nil || p != "8000" {
 		t.Errorf("urlPort = %q, %v", p, err)
+	}
+}
+
+// TestAttachedServerURL checks the address of an attached server on
+// another host: its name and scheme are kept, so status, chat and the
+// metrics reach the server where it runs.
+func TestAttachedServerURL(t *testing.T) {
+	cases := []struct {
+		base, want string
+	}{
+		{"http://chardis:8000", "http://chardis:8000"},
+		{"https://chardis.lan:443", "https://chardis.lan:443"},
+		{"http://127.0.0.1:8000", "http://127.0.0.1:8000"},
+	}
+	for _, c := range cases {
+		port, _ := urlPort(c.base)
+		n, _ := strconv.Atoi(port)
+		rec := Record{Host: attachHost(c.base), Port: n, Scheme: attachScheme(c.base), Foreign: true}
+		if got := rec.URL(); got != c.want {
+			t.Errorf("%s: URL() = %q, want %q", c.base, got, c.want)
+		}
 	}
 }

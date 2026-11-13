@@ -3,8 +3,10 @@ package app
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/opengfx1030/bernie/internal/serving/runner"
+	"github.com/opengfx1030/bernie/internal/support/netx"
 )
 
 // AttachOptions are the inputs of Attach: the URL (or port) of an already
@@ -42,4 +44,25 @@ func AttachSentence(r *AttachResult) string {
 		return ""
 	}
 	return fmt.Sprintf("attached %s at %s; bernie did not start it and will not stop it", r.Run.Name, r.Run.URL())
+}
+
+// ServerTarget reports whether the dashboard may send requests to target:
+// a server of this host, or a server the operator attached with `bernie
+// attach` (spec §8.4). Any other address is refused, so a page cannot
+// point bernie at a host nobody registered.
+func ServerTarget(ctx context.Context, target string) bool {
+	if netx.Loopback(target) {
+		return true
+	}
+	runs, err := runner.List(ctx)
+	if err != nil {
+		return false
+	}
+	want := strings.TrimRight(strings.TrimSuffix(strings.TrimSpace(target), "/v1"), "/")
+	for _, r := range runs {
+		if r.Foreign && r.URL() == want {
+			return true
+		}
+	}
+	return false
 }

@@ -69,7 +69,7 @@ async function loadHW(force) {
 }
 
 function runsOf(data) { return Array.isArray(data) ? data : (data && data.runs) || []; }
-function runURL(r) { return "http://" + (r.host || "127.0.0.1") + ":" + r.port; }
+function runURL(r) { return (r.scheme || "http") + "://" + (r.host || "127.0.0.1") + ":" + r.port; }
 
 /** refreshHost drops every cached answer of the host: hw, topo, doctor,
  *  onboarding, power, runs. The next reader of one of those endpoints

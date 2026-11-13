@@ -49,6 +49,11 @@ type Record struct {
 	// attached with `bernie attach` (R29). bernie never stops a foreign
 	// server; Stop only forgets the record.
 	Foreign bool `json:"foreign,omitempty"`
+	// Scheme is the scheme of an attached server: http (the default) or
+	// https.
+	Scheme string `json:"scheme,omitempty"`
+	// Model is the first model id an attached server listed.
+	Model string `json:"model,omitempty"`
 }
 
 // Status is a record with its live state.
@@ -66,7 +71,11 @@ func (r Record) URL() string {
 	case "", "0.0.0.0", "::", "[::]":
 		h = "127.0.0.1"
 	}
-	return "http://" + net.JoinHostPort(h, strconv.Itoa(r.Port))
+	scheme := r.Scheme
+	if scheme == "" {
+		scheme = "http"
+	}
+	return scheme + "://" + net.JoinHostPort(h, strconv.Itoa(r.Port))
 }
 
 func recordPath(name string) string { return filepath.Join(RunDir(name), "run.json") }
