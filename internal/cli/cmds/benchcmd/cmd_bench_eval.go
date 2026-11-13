@@ -73,7 +73,7 @@ func runEval(c *cli.Context, cmd *cli.Command, args []string) error {
 	fs.StringVar(&o.Kind, "kind", eval.KindOpenAI, "openai (vLLM, any OpenAI-compatible server) or openwebui")
 	fs.StringVar(&models, "model", "", "comma list of models, run one after the other (default: the first model of the server)")
 	fs.StringVar(&o.Suite, "suite", eval.DefaultSuite, "smoke (13 cases), core (52) or extended (78), per context size")
-	fs.StringVar(&contexts, "context", strconv.Itoa(eval.DefaultContext), "comma list of approximate prompt sizes in tokens")
+	fs.StringVar(&contexts, "context", strconv.Itoa(eval.DefaultContext), "comma list of approximate prompt sizes in tokens, or auto: bands up to the server's max_model_len")
 	fs.StringVar(&tracks, "tracks", "", "comma list of tracks (default: all; bernie bench eval tracks lists them)")
 	fs.Int64Var(&o.Seed, "seed", eval.DefaultSeed, "case seed: the same seed asks the same cases")
 	fs.IntVar(&o.Repeats, "repeats", 1, "times every case is asked")
@@ -92,6 +92,10 @@ func runEval(c *cli.Context, cmd *cli.Command, args []string) error {
 	o.Tracks = splitList(tracks)
 	o.TimeoutS = int(timeout / time.Second)
 	for _, f := range splitList(contexts) {
+		if f == "auto" {
+			o.AutoContext = true
+			continue
+		}
 		n, err := strconv.Atoi(f)
 		if err != nil || n < 1 {
 			return cli.Usagef("--context: %q is not a positive integer", f)
@@ -132,6 +136,9 @@ func printEvalResult(w io.Writer, r *eval.Result) {
 	o := r.Options
 	fmt.Fprintf(w, "%s  %s  %s\n", r.ID, r.URL, r.Status)
 	fmt.Fprintf(w, "suite %s (v%s), seed %d, %d repeat(s), contexts %s\n", o.Suite, r.Version, o.Seed, o.Repeats, joinInts(o.Contexts))
+	if p := r.ContextPlan; p != nil {
+		fmt.Fprintf(w, "contexts auto: max_model_len %d - headroom %d = ceiling %d\n", p.ModelLimit, p.Headroom, p.Ceiling)
+	}
 	for _, s := range r.Summary {
 		fmt.Fprintf(w, "\n%s: %d/%d passed (%s), %d failed, %d errors, %d skipped, %d critical, %d loops, %.1f s a case\n",
 			s.Model, s.Passed, s.Graded, pct(s.Accuracy), s.Failed, s.Errors, s.Skipped, s.CriticalFailures, s.Loops, s.AvgLatencyS)

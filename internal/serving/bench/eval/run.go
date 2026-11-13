@@ -23,13 +23,16 @@ const (
 // Options are the inputs of a run. Models are run one after the other on
 // the same generated cases.
 type Options struct {
-	URL         string   `json:"url"`
-	Kind        string   `json:"kind"` // openai or openwebui
-	Models      []string `json:"models"`
-	Suite       string   `json:"suite"`
-	Seed        int64    `json:"seed"`
-	Repeats     int      `json:"repeats"`
-	Contexts    []int    `json:"context_sizes"`
+	URL      string   `json:"url"`
+	Kind     string   `json:"kind"` // openai or openwebui
+	Models   []string `json:"models"`
+	Suite    string   `json:"suite"`
+	Seed     int64    `json:"seed"`
+	Repeats  int      `json:"repeats"`
+	Contexts []int    `json:"context_sizes"`
+	// AutoContext picks the context sizes from the server's max_model_len
+	// with Plan instead of taking Contexts.
+	AutoContext bool     `json:"auto_context,omitempty"`
 	Tracks      []string `json:"tracks,omitempty"`
 	Temperature float64  `json:"temperature"`
 	MaxTokens   int      `json:"max_tokens"`
@@ -52,7 +55,10 @@ func Normalize(o Options) (Options, error) {
 	if o.Repeats == 0 {
 		o.Repeats = 1
 	}
-	if len(o.Contexts) == 0 {
+	if o.AutoContext && len(o.Contexts) > 0 {
+		return o, errors.New("--context auto picks the sizes itself; do not name sizes with it")
+	}
+	if len(o.Contexts) == 0 && !o.AutoContext {
 		o.Contexts = []int{DefaultContext}
 	}
 	if o.MaxTokens == 0 {
@@ -115,6 +121,9 @@ type CaseResult struct {
 	Expected         Expected       `json:"expected"`
 	Details          map[string]any `json:"details,omitempty"`
 	Events           []Event        `json:"events,omitempty"`
+	// Admission is how the case was fitted to the server. It is absent
+	// when the server has neither a tokenizer nor a reported limit.
+	Admission *Admission `json:"context_admission,omitempty"`
 }
 
 // Run asks every model every case, one request at a time, and grades the
@@ -128,13 +137,6 @@ func Run(ctx context.Context, o Options, progress io.Writer) (*Result, error) {
 	o, err := Normalize(o)
 	if err != nil {
 		return nil, err
-	}
-	cases, err := Generate(o.Suite, o.Seed, o.Contexts, o.Tracks)
-	if err != nil {
-		return nil, err
-	}
-	if len(cases) == 0 {
-		return nil, errors.New("no case selected")
 	}
 	cl := newClient(o)
 	served, err := cl.models(ctx)
@@ -156,7 +158,30 @@ func Run(ctx context.Context, o Options, progress io.Writer) (*Result, error) {
 			return nil, fmt.Errorf("%s does not serve model %q", cl.base, m)
 		}
 	}
+	var plan *ContextPlan
+	if o.AutoContext {
+		// The bands of every model are the same, so the smallest limit
+		// decides them.
+		limit := 0
+		for _, m := range o.Models {
+			if l := limits[m]; l > 0 && (limit == 0 || l < limit) {
+				limit = l
+			}
+		}
+		if plan, err = Plan(o.Suite, limit, o.MaxTokens); err != nil {
+			return nil, err
+		}
+		o.Contexts = plan.Contexts
+	}
+	cases, err := Generate(o.Suite, o.Seed, o.Contexts, o.Tracks)
+	if err != nil {
+		return nil, err
+	}
+	if len(cases) == 0 {
+		return nil, errors.New("no case selected")
+	}
 	res := newResult(o, cl.base)
+	res.ContextPlan = plan
 	fmt.Fprintf(progress, "eval: %s, suite %s (%d cases), %d model(s), %d repeat(s), contexts %s, seed %d\n",
 		cl.base, o.Suite, len(cases), len(o.Models), o.Repeats, intList(o.Contexts), o.Seed)
 	total := len(cases) * o.Repeats * len(o.Models)
@@ -184,21 +209,19 @@ func Run(ctx context.Context, o Options, progress io.Writer) (*Result, error) {
 	return res, nil
 }
 
-// fits reports whether the prompt and the reply of a case fit the context
-// of the server, with the 4 characters a token estimate.
-func fits(c *Case, maxTokens, limit int) bool {
-	return limit <= 0 || c.Estimate.EstimatedTokens+maxTokens <= limit
-}
-
 func runCase(ctx context.Context, cl *client, o Options, model string, rep int, c *Case, limit int) CaseResult {
 	r := CaseResult{Model: model, CaseID: c.ID, Track: c.Track, Family: c.Family, Variant: c.Variant,
 		Context: c.Context, Estimate: c.Estimate, Repeat: rep, Question: c.Question, Expected: c.Expected}
-	if !fits(c, o.MaxTokens, limit) {
-		r.Status = StatusSkipped
-		r.Error = fmt.Sprintf("the prompt (about %d tokens) and %d reply tokens exceed the server's max-model-len %d",
-			c.Estimate.EstimatedTokens, o.MaxTokens, limit)
+	// A case whose evidence does not fit is skipped with the reason,
+	// never sent: a refusal of the server would grade the context, not
+	// the model.
+	sent, adm, err := admit(ctx, cl.tokenize(model, o.Kind), c, o.MaxTokens, limit)
+	r.Admission = adm
+	if err != nil {
+		r.Status, r.Error = StatusSkipped, err.Error()
 		return r
 	}
+	c = sent
 	start := time.Now()
 	world := c.World
 	if world != nil {

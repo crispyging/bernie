@@ -17,14 +17,17 @@ import (
 
 // Result is one saved evaluation run.
 type Result struct {
-	ID      string         `json:"id"`
-	Version string         `json:"version"`
-	URL     string         `json:"url"`
-	Time    time.Time      `json:"time"`
-	Status  string         `json:"status"` // done or cancelled
-	Options Options        `json:"options"`
-	Summary []ModelSummary `json:"summary"`
-	Cases   []CaseResult   `json:"cases"`
+	ID      string    `json:"id"`
+	Version string    `json:"version"`
+	URL     string    `json:"url"`
+	Time    time.Time `json:"time"`
+	Status  string    `json:"status"` // done or cancelled
+	Options Options   `json:"options"`
+	// ContextPlan is how --context auto picked the sizes; absent when the
+	// sizes were named.
+	ContextPlan *ContextPlan   `json:"context_plan,omitempty"`
+	Summary     []ModelSummary `json:"summary"`
+	Cases       []CaseResult   `json:"cases"`
 }
 
 // Bucket counts the cases of one track or one context size.

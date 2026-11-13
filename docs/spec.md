@@ -1954,7 +1954,7 @@ comes from BroodBench.
 | `--kind` | `openai` | `openai` (vLLM, an attached server, any OpenAI-compatible server) or `openwebui`. Open WebUI presets, prompts and pipelines are part of what is measured. |
 | `--model` | the first model of the server | Comma list. The models answer the same cases one after the other. |
 | `--suite` | `smoke` | `smoke` (13 cases), `core` (52) or `extended` (78) per context size, over 13 scenario families. |
-| `--context` | `4096` | Comma list of approximate prompt sizes in tokens, at most 8. |
+| `--context` | `4096` | Comma list of approximate prompt sizes in tokens, at most 8, or `auto`: the bands of the context plan (below). |
 | `--tracks` | all | Comma list of `recall`, `state`, `reasoning`, `structured`, `agent`, `memory`. |
 | `--seed` | `42` | The same seed asks the same cases. |
 | `--repeats` | `1` | Times every case is asked, 1 to 10. |
@@ -1984,11 +1984,47 @@ The cases:
   first write once. More than 6 tool turns, or two failed or repeated calls
   in a row, is a loop. A critical or looping case never passes.
 
+The context plan (`--context auto`) picks the bands from the server, as
+BroodBench's planner does:
+
+- The limit is the smallest `max_model_len` of the models of the run. A
+  server that reports none cannot plan: name the sizes.
+- The headroom is max(4096, `--max-tokens` + 1024). The ceiling is the
+  limit less the headroom; the longest band is the ceiling rounded down to
+  a multiple of 2048.
+- `smoke` gets 3 bands, `core` 4 and `extended` 6. The first band is 2048
+  tokens, the last the longest band. The bands between them come from
+  2048, 4096, 8192, 12288, 16384, 24576, 32768, 49152, 65536, 98304,
+  131072 and so on: first the largest step between two neighbours is kept
+  as small as possible, then the bands stay closest to an even log scale.
+  With a 32768-token limit, `smoke` asks 2048, 8192 and 28672.
+- Every case is asked at every band. The result keeps the plan in
+  `context_plan`: `model_limit`, `headroom`, `ceiling` and `contexts`.
+
 The run:
 
-- bernie reads `max_model_len` from the models list (vLLM). A case whose
-  prompt and reply tokens do not fit is `skipped` with the reason and never
-  sent.
+- bernie reads `max_model_len` from the models list (vLLM). Before a case
+  is sent, the context admission fits it to its band and to the server.
+  The reply reservation is `--max-tokens` + 512. With vLLM's `/tokenize`
+  (the chat form, with the tools), the budget is the band, the limit less
+  the reservation and the `max_model_len` of `/tokenize` less the
+  reservation, whichever is smallest. Without a tokenizer the budget is the
+  limit less the reservation, and the count is a third of the bytes of the
+  request plus 256: an upper bound of the generated text, which is about 4
+  characters a token. (BroodBench uses the bytes plus 4096; on a server
+  with a small context that refuses every case.)
+- While the count is over the budget, bernie removes distractor records,
+  evenly spread, and counts again, at most 5 times. Only the generated
+  distractor records are ever removed: the evidence, the question and the
+  tools are never cut. A case that still does not fit, or whose
+  reservation leaves no room, is `skipped` with the reason and never sent.
+- The case keeps `context_admission`: `count_source`
+  (`serving_tokenizer` or `conservative_byte_admission`),
+  `engine_context_limit`, `admitted_prompt_budget`,
+  `actual_prompt_tokens` or `estimated_prompt_upper_bound`, and
+  `removed_distractor_records`. A server with neither a tokenizer nor a
+  `max_model_len` gets the case as it was built, and the case has no
+  `context_admission`.
 - A case that the server refuses is `error` with the status and the
   server's own message, for example `HTTP 400: maximum context length is
   8192 tokens`. A reply that breaks the tool protocol is `fail`.
@@ -2002,7 +2038,8 @@ Accuracy is passed ÷ graded: a skipped case is not graded, an error counts
 as not passed. The summary splits it by track and by context size and
 counts critical cases and loops. A case keeps its question, the reply, the
 expected value, the tool events and the grader details. The full prompt is
-not saved: the seed, the suite and the context size give it back.
+not saved: the seed, the suite and the context size give it back, less the
+distractor records `context_admission` says were removed.
 
 ## 11. Dashboard
 

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -39,7 +40,15 @@ func oracle(t *testing.T, cases []Case, maxLen int, reject func(promptChars int)
 				return
 			}
 		}
-		c := truth[prompt]
+		// Admission may remove distractor records, so the oracle finds the
+		// case by its evidence, which is never cut.
+		var c *Case
+		for _, k := range cases {
+			if strings.Contains(prompt, k.Question) {
+				c = truth[k.Messages[1].Content]
+				break
+			}
+		}
 		msg := map[string]any{"role": "assistant", "content": ""}
 		switch {
 		case c == nil:
@@ -105,7 +114,10 @@ func TestRunPassesAKnownGoodServer(t *testing.T) {
 	}
 }
 
-func TestRunSkipsCasesBeyondTheServerContext(t *testing.T) {
+// TestRunAdmitsCasesBeyondTheServerContext checks that a case built for a
+// band beyond the server's context loses distractor records until it fits,
+// and is graded like any other.
+func TestRunAdmitsCasesBeyondTheServerContext(t *testing.T) {
 	cases, _ := Generate("smoke", 5, []int{512, 8192}, []string{"recall"})
 	srv := oracle(t, cases, 4096, nil)
 	var log strings.Builder
@@ -114,11 +126,56 @@ func TestRunSkipsCasesBeyondTheServerContext(t *testing.T) {
 		t.Fatal(err)
 	}
 	s := r.Summary[0]
-	if s.Skipped == 0 || s.Passed != s.Graded || s.Graded == 0 {
+	if s.Skipped != 0 || s.Passed != s.Graded || s.Graded != len(cases) {
+		t.Fatalf("summary %+v\n%s", s, log.String())
+	}
+	for _, c := range r.Cases {
+		a := c.Admission
+		if a == nil || a.CountSource != "conservative_byte_admission" || a.Budget != 4096-1024-512 {
+			t.Fatalf("%s: admission %+v", c.CaseID, a)
+		}
+		if (c.Context == 8192) != (a.Removed > 0) {
+			t.Errorf("%s: %d records removed at context %d", c.CaseID, a.Removed, c.Context)
+		}
+	}
+}
+
+// TestRunSkipsCasesWhoseEvidenceDoesNotFit checks that a case is skipped
+// with the reason, never sent, when the reply reservation leaves no room.
+func TestRunSkipsCasesWhoseEvidenceDoesNotFit(t *testing.T) {
+	cases, _ := Generate("smoke", 5, []int{512}, []string{"recall"})
+	srv := oracle(t, cases, 1400, nil)
+	var log strings.Builder
+	r, err := Run(context.Background(), Options{URL: srv.URL, Seed: 5, Contexts: []int{512}, Tracks: []string{"recall"}}, &log)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s := r.Summary[0]; s.Skipped != len(cases) || s.Graded != 0 {
 		t.Fatalf("summary %+v", s)
 	}
-	if !strings.Contains(log.String(), "exceed the server's max-model-len 4096") {
+	if !strings.Contains(log.String(), "context admission: 1024 reply tokens leave no room") {
 		t.Errorf("the log does not say why a case was skipped:\n%s", log.String())
+	}
+}
+
+// TestRunPlansTheContexts checks --context auto against the server's
+// max_model_len.
+func TestRunPlansTheContexts(t *testing.T) {
+	cases, _ := Generate("smoke", 5, []int{2048, 8192, 28672}, []string{"recall"})
+	srv := oracle(t, cases, 32768, nil)
+	r, err := Run(context.Background(), Options{URL: srv.URL, Seed: 5, AutoContext: true, Tracks: []string{"recall"}}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	p := r.ContextPlan
+	if p == nil || p.ModelLimit != 32768 || !slices.Equal(r.Options.Contexts, []int{2048, 8192, 28672}) {
+		t.Fatalf("plan %+v, contexts %v", p, r.Options.Contexts)
+	}
+	if s := r.Summary[0]; s.Passed != s.Graded || s.Graded != len(cases) {
+		t.Errorf("summary %+v", s)
+	}
+	if _, err := Normalize(Options{AutoContext: true, Contexts: []int{4096}}); err == nil {
+		t.Error("auto with named sizes was accepted")
 	}
 }
 
