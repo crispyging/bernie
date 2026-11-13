@@ -43,6 +43,7 @@ Packages are grouped by role: `internal/machine` (what the host is),
 | `internal/serving/vllm/vllmtest` | the deterministic fake vLLM server for tests | `Config`, `Server`, `New`, `CountTokens`, `Prompts`, `ServeHTTP` | 2 |
 | `internal/serving/bench` | the benchmark | `Run`, `Save`, `List`, `Get`, `Options`, `Result` | 2 |
 | `internal/serving/bench/suite` | the bench suites | `Load`, `List`, `Get`, `Run`, `Compare`, `Judge`, `AB` | 2 |
+| `internal/serving/bench/eval` | the quality evaluation: seeded cases, simulated tools, graders, runner, results | `Generate`, `Evaluate`, `Execute`, `Run`, `Save`, `Get`, `List` | 2 |
 | `internal/serving/weights` | the model files a server loads, with their hashes | `Of`, `Model`, `File` | 2 |
 | `internal/machine/gpu` | the live GPUs | `List`, `Telemetry`, `TelemetryFast`, `TelemetrySlow`, `MergeSlow`, `Archs`, `ArchMatch`, `ECC` | 1 |
 | `internal/machine/gpu/devices` | the device tables | `Lookup`, `LookupArch`, `CodeTargets`, `GFXName`, `Arch`, `Device` | 1 |

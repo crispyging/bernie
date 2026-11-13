@@ -290,6 +290,8 @@ other file, script or compose file is required.
 | `bernie bench list` / `bench show <ID>` | no | Saved results. |
 | `bernie bench compare <ID-A> <ID-B> [--band P] [--markdown]` | no | Two results side by side with a verdict. Refuses two different workloads. `--markdown` prints the receipt of the comparison as markdown. |
 | `bernie bench ab --base ARM --cand ARM` | yes (it starts and stops a server for every arm) | Run a baseline and a candidate in the order base, cand, cand, base and tell the verdict. |
+| `bernie bench eval [--url U] [--kind K] [--model M,...] [--suite S] [--context N,...] [--tracks T,...] [--seed N] [--repeats N]` | no | Grade the answers of a server on seeded technical-workflow cases. Save the result ([§10.5](#105-quality-evaluation)). |
+| `bernie bench eval list` / `eval show <ID>` / `eval tracks` | no | Saved eval results; the suites and the tracks. |
 | `bernie config show` / `config set <KEY> <VALUE>` | yes (config file) | User defaults. |
 | `bernie fleet add <NAME> <URL> [--token T]` / `fleet rm <NAME>` / `fleet ls` | yes (config file) | List of other bernie hosts the Fleet tab watches. The token is stored in the config file with `0600`; it is never sent to the browser ([§11](#11-dashboard)). |
 | `bernie dash [--listen ADDR] [--token T] [--demo] [--host]` | no | Start the dashboard in the foreground. `--demo` serves a captured host and a fake run from a sandbox under the user cache, with the banner "Demo: nothing here is real"; it needs no GPU and changes nothing on the host. `--host` binds every interface ([§3.2](#32-rules)). |
@@ -1861,6 +1863,69 @@ visits can be inspected with `bernie bench show`.
 
 The verdict compares the medians of the visits of the two arms. Its rules
 are the rules of §10.3.
+
+### 10.5 Quality evaluation
+
+`bernie bench eval` measures whether a server answers right, not how fast.
+It asks seeded synthetic technical-workflow cases one request at a time on
+`/chat/completions` and grades every reply with a deterministic grader. It
+comes from BroodBench.
+
+| Flag | Default | Meaning |
+|---|---|---|
+| `--url` | the only running run, else `http://127.0.0.1:8000` | The server. `/v1` is added for `openai`, `/api` for `openwebui`. |
+| `--kind` | `openai` | `openai` (vLLM, an attached server, any OpenAI-compatible server) or `openwebui`. Open WebUI presets, prompts and pipelines are part of what is measured. |
+| `--model` | the first model of the server | Comma list. The models answer the same cases one after the other. |
+| `--suite` | `smoke` | `smoke` (13 cases), `core` (52) or `extended` (78) per context size, over 13 scenario families. |
+| `--context` | `4096` | Comma list of approximate prompt sizes in tokens, at most 8. |
+| `--tracks` | all | Comma list of `recall`, `state`, `reasoning`, `structured`, `agent`, `memory`. |
+| `--seed` | `42` | The same seed asks the same cases. |
+| `--repeats` | `1` | Times every case is asked, 1 to 10. |
+| `--temperature` | `0` | Sampling temperature. |
+| `--max-tokens` | `1024` | Reply tokens of one request. |
+| `--timeout` | `120s` | Time limit of one request, at most 600 s. |
+| `--tag` | none | Free label stored with the result. |
+
+The API key of the server comes from `$BERNIE_BENCH_API_KEY`. It is sent
+as `Authorization: Bearer`, never as a flag, and never saved.
+
+The cases:
+
+- A case is one question about a synthetic record, padded with archived
+  distractor records to about the context size (4 characters a token, not
+  counted by the server's tokenizer). The evidence sits at the beginning,
+  the middle or the end of the padding. The padding never changes the truth
+  of a case.
+- An answer case passes when the trimmed reply equals the expected value.
+  A missing fact must be answered `insufficient evidence`.
+- A JSON case passes when the reply is one JSON object with no repeated key
+  that equals the expected object.
+- An agent case gets two simulated tools, `get_asset` and `move_asset`, on
+  an in-memory world. It passes when the world reaches the goal and the
+  model read a write back. A write to the protected `production` asset is
+  refused and marks the case critical. A bounded-recovery world fails its
+  first write once. More than 6 tool turns, or two failed or repeated calls
+  in a row, is a loop. A critical or looping case never passes.
+
+The run:
+
+- bernie reads `max_model_len` from the models list (vLLM). A case whose
+  prompt and reply tokens do not fit is `skipped` with the reason and never
+  sent.
+- A case that the server refuses is `error` with the status and the
+  server's own message, for example `HTTP 400: maximum context length is
+  8192 tokens`. A reply that breaks the tool protocol is `fail`.
+- Every case writes one progress line on stderr: the model, the case, the
+  context, the verdict and the reason it did not pass.
+- An eval and a speed benchmark never run at the same time.
+
+The result is `<state>/bench/eval/<id>.json`: the options, the status
+(`done` or `cancelled`), one `summary` per model and one entry per case.
+Accuracy is passed ÷ graded: a skipped case is not graded, an error counts
+as not passed. The summary splits it by track and by context size and
+counts critical cases and loops. A case keeps its question, the reply, the
+expected value, the tool events and the grader details. The full prompt is
+not saved: the seed, the suite and the context size give it back.
 
 ## 11. Dashboard
 
