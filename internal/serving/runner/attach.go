@@ -2,8 +2,10 @@ package runner
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"os"
@@ -28,7 +30,8 @@ func (e *AttachError) Unwrap() error { return e.Err }
 
 // AttachOptions is what `bernie attach` and `POST /api/attach` accept.
 // Name is the run name; URL is the http(s) base URL of the vLLM server
-// (a port number is shorthand for http://127.0.0.1:PORT). Recipe is the
+// (a port number is shorthand for http://127.0.0.1:PORT; the host may be
+// another machine, spec §8.4). Recipe is the
 // recipe id to attach under; "" means the attached server does not
 // belong to a recipe.
 type AttachOptions struct {
@@ -54,15 +57,16 @@ func Attach(ctx context.Context, o AttachOptions) (*Record, error) {
 	}
 	base, err := normalizeAttachURL(o.URL)
 	if err != nil {
-		return nil, &AttachError{Reason: "url is not a loopback address", Err: err}
+		return nil, &AttachError{Reason: "url is not a server address", Err: err}
 	}
-	if err := attachProbe(ctx, base, "/health"); err != nil {
+	if _, err := attachProbe(ctx, base, "/health"); err != nil {
 		return nil, &AttachError{Reason: "/health did not answer", Err: err}
 	}
-	if err := attachProbe(ctx, base, "/metrics"); err != nil {
+	if _, err := attachProbe(ctx, base, "/metrics"); err != nil {
 		return nil, &AttachError{Reason: "/metrics did not answer", Err: err}
 	}
-	if err := attachProbe(ctx, base, "/v1/models"); err != nil {
+	models, err := attachProbe(ctx, base, "/v1/models")
+	if err != nil {
 		return nil, &AttachError{Reason: "/v1/models did not answer", Err: err}
 	}
 	port := 0
@@ -74,6 +78,8 @@ func Attach(ctx context.Context, o AttachOptions) (*Record, error) {
 		Port:      port,
 		StartedAt: time.Now().UTC().Truncate(time.Second),
 		Foreign:   true,
+		Scheme:    attachScheme(base),
+		Model:     firstModel(models),
 	}
 	if err := writeRecord(rec); err != nil {
 		return nil, &AttachError{Reason: "save the record", Err: err}
@@ -114,8 +120,8 @@ func normalizeAttachURL(raw string) (string, error) {
 	if u.Scheme != "http" && u.Scheme != "https" {
 		return "", fmt.Errorf("url %q is not http(s)", raw)
 	}
-	if !attachLoopback(u.Hostname()) {
-		return "", fmt.Errorf("url %q is not on this host; attach only registers loopback servers", raw)
+	if u.Hostname() == "" {
+		return "", fmt.Errorf("url %q names no host", raw)
 	}
 	if u.Port() == "" {
 		if u.Scheme == "https" {
@@ -130,26 +136,45 @@ func normalizeAttachURL(raw string) (string, error) {
 	return u.String(), nil
 }
 
-func attachProbe(ctx context.Context, base, path string) error {
+// attachProbe asks the server for path and returns the start of the body.
+func attachProbe(ctx context.Context, base, path string) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, base+path, nil)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode >= 400 {
-		return fmt.Errorf("%s: %s", path, resp.Status)
+		return nil, fmt.Errorf("%s: %s", path, resp.Status)
 	}
-	return nil
+	return io.ReadAll(io.LimitReader(resp.Body, 64<<10))
 }
 
-func attachLoopback(h string) bool {
-	return h == "127.0.0.1" || h == "::1" || h == "localhost" || h == ""
+// firstModel is the first model id of a /v1/models answer, or "".
+func firstModel(body []byte) string {
+	var doc struct {
+		Data []struct {
+			ID string `json:"id"`
+		} `json:"data"`
+	}
+	if json.Unmarshal(body, &doc) != nil || len(doc.Data) == 0 {
+		return ""
+	}
+	return doc.Data[0].ID
+}
+
+// attachScheme is the scheme of an attached server, empty for http (the
+// default of a record).
+func attachScheme(base string) string {
+	if u, err := url.Parse(base); err == nil && u.Scheme == "https" {
+		return "https"
+	}
+	return ""
 }
 
 func attachHost(base string) string {

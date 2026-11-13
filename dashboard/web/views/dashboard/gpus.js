@@ -136,7 +136,8 @@ function dashGPUOverview(section) {
       plan.textContent = !run ? "Configured run plan: none."
         : selected ? (run.state === "exited" ? "Last configured plan" : "Configured run plan") + " (" + run.name + "): "
           + (selected.length ? selected.map((i) => "GPU " + i).join(", ") + " · " + selected.length + " selected." : "no GPUs listed.")
-          : (run.foreign ? "Attached server" : "Run plan") + " GPU selection: unknown.";
+          : runRemote(run) ? "The attached server runs on " + run.host + "; the GPUs below are of this host."
+            : (run.foreign ? "Attached server" : "Run plan") + " GPU selection: unknown.";
       restriction.textContent = dash.hw && dash.hw.restriction ? " · " + dash.hw.restriction : "";
       inspect();
     },

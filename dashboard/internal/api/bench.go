@@ -2,6 +2,7 @@ package api
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -14,7 +15,6 @@ import (
 	"github.com/opengfx1030/bernie/internal/app"
 	"github.com/opengfx1030/bernie/internal/serving/bench"
 	"github.com/opengfx1030/bernie/internal/serving/bench/suite"
-	"github.com/opengfx1030/bernie/internal/support/netx"
 )
 
 // GET /api/bench — `bernie bench list --json`.
@@ -117,15 +117,15 @@ func (b benchRequest) options() (bench.Options, error) {
 	return o, nil
 }
 
-// benchTarget rejects a target outside this host. An empty target takes the
-// local default when the run starts.
-func benchTarget(raw string) error {
+// benchTarget rejects a target outside this host that was not attached. An
+// empty target takes the local default when the run starts.
+func benchTarget(ctx context.Context, raw string) error {
 	if raw == "" {
 		return nil
 	}
 	u, err := url.Parse(raw)
-	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || !netx.Loopback(u.Hostname()) {
-		return fmt.Errorf("the benchmark only targets a server of this host: %s", raw)
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || !app.ServerTarget(ctx, raw) {
+		return fmt.Errorf("the benchmark only targets a server of this host or an attached one: %s", raw)
 	}
 	return nil
 }
@@ -172,7 +172,7 @@ func (h *handler) postBench(w http.ResponseWriter, r *http.Request) {
 		httpjson.Error(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	if err := benchTarget(o.URL); err != nil {
+	if err := benchTarget(r.Context(), o.URL); err != nil {
 		httpjson.Error(w, http.StatusBadRequest, err.Error())
 		return
 	}

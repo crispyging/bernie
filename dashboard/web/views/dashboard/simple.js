@@ -14,6 +14,28 @@ function dashSimpleHero() {
   const chat = h("a.btn.primary", { href: "#chat" }, "Test in Chat");
   const connect = h("a.btn", { href: "#dashboard/connect" }, "Connect an app");
   const logs = h("a.btn", { href: "#logs" }, "Open Logs");
+  const attachURL = h("input", { inputmode: "url", placeholder: "http://chardis:8000", "aria-label": "Address of the running vLLM server" });
+  const attachBtn = h("button", { type: "submit" }, "Attach");
+  const attachForm = h("form.dash-attach-form", attachURL, attachBtn);
+  const attach = h("details.dash-attach", h("summary", "Use a server that is already running"), attachForm);
+  // An attached server is named after its host: chardis for http://chardis:8000.
+  const attachName = (raw) => {
+    let host = "";
+    try { host = new URL(raw.includes("://") ? raw : "http://" + raw).hostname; } catch (e) { /* the server checks the address */ }
+    const name = /^\d+$/.test(raw.trim()) ? "" : host.toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^[^a-z0-9]+/, "");
+    return !name || /^(127\.|localhost$)/.test(name) ? "attached" : name;
+  };
+  attachForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    attachBtn.disabled = true;
+    try {
+      const res = await api("/api/attach", { method: "POST", body: { url: attachURL.value.trim(), name: attachName(attachURL.value) } });
+      toast(res.note, true);
+      attachURL.value = "";
+      attach.open = false;
+      await dashLoad();
+    } catch (err) { toast("Attach failed: " + (err.message || err)); } finally { attachBtn.disabled = false; }
+  });
   let shown = null;
   stop.addEventListener("click", async () => {
     stop.disabled = true;
@@ -29,7 +51,7 @@ function dashSimpleHero() {
   const metricsNote = h("p.small.muted");
   left.append(h("div.dash-simple-top", h("span.eyebrow", "vLLM engine"), statusBadge), word,
     h("div.dash-engine-identity", layout, technical), lede,
-    h("div.dash-simple-actions", start, chat, connect, logs, stop), scope,
+    h("div.dash-simple-actions", start, chat, connect, logs, stop), attach, scope,
     h("div.dash-simple-endpoint", endpointLabel, endpointCode, endpointCopy, endpointNone), metricsNote);
   const amount = h("span", "–");
   const unit = h("small.dash-hero-unit", "tokens/s");
@@ -46,9 +68,9 @@ function dashSimpleHero() {
       const status = dashRunStatus(run);
       const tele = status.tele;
       layout.textContent = run ? "Server · " + run.name : "No server on this host";
-      technical.textContent = run ? (run.foreign ? "Attached server" : run.mode === "container"
+      technical.textContent = run ? (run.foreign ? "Attached server" + (runRemote(run) ? " on " + run.host : "") : run.mode === "container"
         ? (run.engine || "Container") + " deployment" : run.mode === "host" ? "Host process" : "Deployment not recorded") : "";
-      const title = run ? (run.plan && (run.plan.served_name || run.plan.model)) || run.name : status.label;
+      const title = run ? (run.plan && (run.plan.served_name || run.plan.model)) || run.model || run.name : status.label;
       if (word.textContent !== title) word.textContent = title;
       const statusKey = status.kind + status.label;
       if (lastStatus !== statusKey) {
@@ -75,7 +97,7 @@ function dashSimpleHero() {
       stop.hidden = !status.active;
       stop.textContent = run && run.foreign ? "Detach server" : "Stop server";
       stop.title = status.active ? (run.foreign ? "Forget attached server " : "Stop ") + run.name : "";
-      start.hidden = status.active || status.unknown;
+      start.hidden = attach.hidden = status.active || status.unknown;
       chat.hidden = !status.ready;
       connect.hidden = !status.active;
       logs.hidden = !run && !status.unknown;
@@ -140,6 +162,9 @@ function dashEngineConfig() {
 }
 
 // Stop only the named server shown above; attached servers are only forgotten.
+/** runRemote is true for an attached server on another host. */
+function runRemote(r) { return !!r && r.foreign && !/^(127\.|localhost$|::1$|0\.0\.0\.0$|$)/.test(r.host || ""); }
+
 async function dashStopRun(run = dashLiveRun()) {
   if (!run || run.state === "exited") { toast("There is no run to stop."); return; }
   const question = run.foreign ? "Detach " + run.name + "? The model server will keep running."
@@ -308,10 +333,12 @@ function dashSimpleConnect(section) {
     segmented.append(button);
   }
   let painted = "";
+  const local = h("p.small.muted", "127.0.0.1 is local to the model host. An app on another machine needs that host’s reachable address and model port.");
   const paint = () => {
     const run = dashLiveRun();
     const status = dashRunStatus(run);
     const endpoint = connectEndpoint(status.active ? run : null);
+    local.hidden = runRemote(run);
     const key = kind + "|" + endpoint.base + "|" + endpoint.model + "|" + status.label;
     if (key === painted) return;
     painted = key;
@@ -329,8 +356,7 @@ function dashSimpleConnect(section) {
     const snippet = connectSnippet(kind, endpoint);
     put(command, cmdBlock(snippet, "Copy the " + kind + " snippet"));
   };
-  el.append(cardHead("Connect an app"), text,
-    h("p.small.muted", "127.0.0.1 is local to the model host. An app on another machine needs that host’s reachable address and model port."),
+  el.append(cardHead("Connect an app"), text, local,
     h("details.advanced", h("summary", "Example requests · curl or Python"), segmented, command));
   section.append(el);
   return { update: paint };

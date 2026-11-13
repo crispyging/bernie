@@ -123,7 +123,7 @@ Regenerate the table rows with `scripts/check-web.sh --print-globals`.
 | `dashboard/web/views/dashboard/dashboard.js` | `dash`, `dashSection`, `dashInfo`, `dashPush`, `dashSeries`, `dashLiveRun`, `dashRunStatus`, `dashPhase`, `dashLoad`, `dashUpdateSimple`, `dashHistory`, `dashWindowSeries`, `viewDashboard`, `dashSample` |
 | `dashboard/web/views/dashboard/details.js` | `DASH_DETAIL_WINDOWS`, `dashDetails`, `dashLoadDetails`, `dashDetailsRead`, `dashDetailsWindow`, `dashWindowMinutes`, `dashDetailsPower`, `dashDetailsDocuments` |
 | `dashboard/web/views/dashboard/gpus.js` | `dashTile`, `dashEcc`, `dashGPUOverview`, `renderGPUs`, `dashSubscribe` |
-| `dashboard/web/views/dashboard/simple.js` | `dashSimpleHero`, `dashEngineConfig`, `dashStopRun`, `dashMeaning`, `dashSimpleTiles`, `dashSimpleCharts`, `dashSimpleMachine`, `dashBuildSimple`, `dashSimpleConnect` |
+| `dashboard/web/views/dashboard/simple.js` | `dashSimpleHero`, `dashEngineConfig`, `runRemote`, `dashStopRun`, `dashMeaning`, `dashSimpleTiles`, `dashSimpleCharts`, `dashSimpleMachine`, `dashBuildSimple`, `dashSimpleConnect` |
 | `dashboard/web/views/fleet/fleet.js` | `FLEET_STATE_WORD`, `fleetStatePill`, `fleetGPUs`, `fleetRow`, `fleetShare`, `viewFleet` |
 | `dashboard/web/views/logs/advanced.js` | `logsJsonLink`, `logsAdvanced` |
 | `dashboard/web/views/logs/findings.js` | `logPill`, `logSeverityPill`, `logFixIsCommand`, `logFinding`, `logFindings` |
