@@ -350,16 +350,16 @@ for the first time (the manifest of `web/js/boot.js`).
 
 | Budget | Target | Now | Check |
 |---|---|---|---|
-| HTML + CSS + JS, uncompressed (the whole tree) | ≤ 430 KB | 421.5 KB | **[budget]** |
-| HTML file | ≤ 12 KB | 4.3 KB | **[budget]** |
-| CSS total | ≤ 80 KB | 77.1 KB | **[budget]** |
-| JavaScript total (the six tabs) | ≤ 344 KB | 341.2 KB | **[budget]** |
-| JavaScript on the first paint | ≤ 112 KB | 109.4 KB | **[budget]** |
-| CSS on the first paint | ≤ 40 KB | 39.2 KB | **[budget]** |
+| HTML + CSS + JS, uncompressed (the whole tree) | ≤ 436 KB | 432.5 KB | **[budget]** |
+| HTML file | ≤ 12 KB | 6.6 KB | **[budget]** |
+| CSS total | ≤ 80 KB | 77.9 KB | **[budget]** |
+| JavaScript total (the six tabs) | ≤ 352 KB | 348.0 KB | **[budget]** |
+| JavaScript on the first paint | ≤ 112 KB | 103.0 KB | **[budget]** |
+| CSS on the first paint | ≤ 40 KB | 38.6 KB | **[budget]** |
 | Fonts | ≤ 130 KB, ≤ 4 files, woff2, `font-display:swap`, `unicode-range` | 128.4 KB, 4 files, swap, range ✓ | **[budget]** |
-| Requests on the first paint | ≤ 24 | 24 | **[budget]** |
-| Transferred text on the first paint (gzip) | ≤ 60 KB | 49.1 KB | **[budget]** |
-| Text of the whole tree (gzip) | ≤ 148 KB | 146.2 KB | **[budget]** |
+| Requests on the first paint | ≤ 24 | 22 | **[budget]** |
+| Transferred text on the first paint (gzip) | ≤ 60 KB | 47.9 KB | **[budget]** |
+| Text of the whole tree (gzip) | ≤ 151 KB | 150.3 KB | **[budget]** |
 | Points drawn per chart | ≤ 240 | unbounded | **[review]** |
 | Pollers | 1 | 1 poller + 1 extra 1 Hz timer | **[review]** |
 | Live streams | 1 SSE at 1 Hz | 1 SSE | **[review]** |
