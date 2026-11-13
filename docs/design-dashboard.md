@@ -441,9 +441,9 @@ KB below means 1024 bytes. These are payload sizes, not page-load timings.
 
 | Budget | Target | Measured | Note |
 |---|---|---|---|
-| The whole page (HTML + CSS + JS, uncompressed) | ≤ 456 KB | **447.8 KB** | the whole tree; raised from 444 KB for the compare page of the Quality tab and the look of the Dashboard |
+| The whole page (HTML + CSS + JS, uncompressed) | ≤ 456 KB | **448.8 KB** | the whole tree; raised from 444 KB for the compare page of the Quality tab and the look of the Dashboard |
 | HTML | ≤ 12 KB | **6.9 KB** | `index.html` |
-| CSS | ≤ 80 KB | **79.7 KB** | shared styles plus lazy tab styles; obsolete dashboard rules removed |
+| CSS | ≤ 84 KB | **80.7 KB** | shared styles plus lazy tab styles; raised from 80 KB for the Quality tab and the look of the Dashboard |
 | JavaScript | ≤ 368 KB | **361.2 KB** | plain and unminified; raised from 360 KB for the compare page of the Quality tab and the look of the Dashboard |
 | JavaScript on the first paint | ≤ 112 KB | **103.6 KB** | the shell and Setup; chooser and path runner load on demand |
 | CSS on the first paint | ≤ 40 KB | **38.6 KB** | the five initial stylesheets |

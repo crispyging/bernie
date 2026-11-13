@@ -163,7 +163,7 @@ func TestPayloadBudget(t *testing.T) {
 	// doc first.
 	const htmlMax = 12 * 1024
 	const jsMax = 368 * 1024 // 361.2 KB now; the nine tabs of plain JavaScript
-	const cssMax = 80 * 1024
+	const cssMax = 84 * 1024 // 80.7 KB now: the Quality tab and the look of the Dashboard
 	const fontsMax = 130 * 1024
 	const treeMax = 456 * 1024
 	if html > htmlMax {

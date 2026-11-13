@@ -37,6 +37,15 @@ This is the reading order of the reference design. The difference is the
 implementation and the data: the Dashboard uses bernie's shared chart,
 meter, tile, command and copy components and the one telemetry stream.
 
+The look follows BroodBench's compare page, which shares bernie's palette:
+the hero and the panels are rounded cards (18 px) with the soft shadow
+`--shadow-2`; the state word is the italic display type in `--key` with
+`--punch-sm`; the section labels are `--key`; the metric tiles are raised
+panels (`--surface-2`, 14 px) whose number is the italic display type in
+`--key` with a hard ink shadow; the charts sit on raised panels. The rules
+live at the end of `views/dashboard/dashboard.css`, scoped to the tab, and
+use the tokens only.
+
 ## The order of the Advanced tab
 
 1. The state headline and Stop/Restart.

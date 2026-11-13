@@ -137,3 +137,20 @@
   .gpu-comparison .gpu-warnings { grid-column: 1 / -1; }
   .gpu-comparison tr.sel > * { background: var(--surface-2); }
 }
+
+/* ---------- the look of BroodBench's compare page: rounded cards with a
+   soft shadow, raised metric tiles with large italic numbers, the display
+   type with its punch, and the charts on raised panels ---------- */
+
+#panel-dashboard .dash-simple-hero,
+#panel-dashboard .card,
+#panel-dashboard .dash-simple-panel { border-radius: 18px; box-shadow: var(--shadow-2); }
+#panel-dashboard .dash-simple-hero .display { font-style: italic; font-weight: 900; color: var(--key); text-shadow: var(--punch-sm); }
+#panel-dashboard .section-label { color: var(--key); }
+#panel-dashboard .dash-simple-tiles .tile { background: var(--surface-2); border-radius: 14px; }
+#panel-dashboard .dash-simple-tiles .tile-n > span:first-child,
+#panel-dashboard .dash-hero-num > span:first-child {
+  font: italic 900 26px var(--font-display); color: var(--key);
+  text-shadow: 2px 2px 0 var(--shadow-ink); font-variant-numeric: tabular-nums;
+}
+#panel-dashboard .chart-figure { background: var(--surface-2); border: 1px solid var(--border); border-radius: 14px; padding: 12px 14px; }
