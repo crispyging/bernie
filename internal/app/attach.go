@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/opengfx1030/bernie/internal/serving/runner"
+	"github.com/opengfx1030/bernie/internal/support/hostroot"
 	"github.com/opengfx1030/bernie/internal/support/netx"
 )
 
@@ -65,4 +66,10 @@ func ServerTarget(ctx context.Context, target string) bool {
 		}
 	}
 	return false
+}
+
+// Discover lists the vLLM servers that run on this host (spec §8.5). It
+// only reads.
+func Discover(ctx context.Context) ([]runner.Found, error) {
+	return runner.Discover(ctx, hostroot.Root())
 }

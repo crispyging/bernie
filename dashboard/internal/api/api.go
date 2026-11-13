@@ -66,6 +66,7 @@ var routes = []struct {
 	{"GET /api/runs", (*handler).getRuns},
 	{"POST /api/runs", (*handler).postRun},
 	{"POST /api/attach", (*handler).postAttach},
+	{"GET /api/discover", (*handler).getDiscover},
 	{"DELETE /api/runs/{name}", (*handler).deleteRun},
 	{"GET /api/runs/{name}/logs", (*handler).getLogs},
 	{"GET /api/runs/{name}/log", (*handler).getRunLog},

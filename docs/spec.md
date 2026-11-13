@@ -272,6 +272,7 @@ other file, script or compose file is required.
 | `bernie chat [--run NAME] [--max-tokens N] "PROMPT"` | no | Send one prompt to the run (default: the run that serves) and stream the answer to stdout as it comes. The reasoning of a model that sends one goes to stderr, and so does the last line: the run, the model, the time to the first token, the tokens and the tok/s. `--json` streams nothing and prints `{"run", "model", "reply", "reasoning", "ttft_ms", "output_tokens", "tok_s"}`. A run that is not `running` ([§8.3](#83-run-record)) is refused and the exit code is not 0. |
 | `bernie connect [openai\|opencode\|openwebui] [--run NAME]` | no | Print the config an app needs to use the run: the base URL (`<run URL>/v1`) and the model name, which is the first id of the server's `/v1/models`. `openai` (the default) prints the `OPENAI_*` variables and a `curl` call, `opencode` an `opencode.json` provider, `openwebui` the variables of its OpenAI connection. stdout holds only the config, so it can be redirected into a file; where it goes is a comment on stderr. `--json` prints `{"app", "run", "base_url", "model", "where", "config"}`. It writes nothing. |
 | `bernie attach <url\|port> [--name N] [--recipe ID]` | yes | Register a vLLM server that bernie did not start, on this host or another one, as a run ([§8.4](#84-attached-servers)). |
+| `bernie attach --scan` | no | List the vLLM servers that run on this host, processes and containers, with the command that attaches each one ([§8.5](#85-servers-found-on-this-host)). |
 | `bernie stop [NAME]` | yes | Stop a run (the only run if NAME is absent). An attached run is only forgotten. |
 | `bernie logs [NAME] [-f] [--tail N]` | no | Show the log of a run. |
 | `bernie compose <id> [--set K=V]... [--mode M] [--name N] [--venv DIR] [--engine E] [--device-access A] [--profile P] [--no-tunableop] [--tuning] [-o FILE]` | no* | Write a `compose.yml` for the plan (*writes FILE only). |
@@ -1440,6 +1441,32 @@ through `POST /api/attach`.
 - To see the GPUs of the other machine too, run bernie there and add it to
   the fleet (`bernie fleet add`).
 
+### 8.5 Servers found on this host
+
+A vLLM stack that runs already does not need a new setup. `bernie attach
+--scan` and `GET /api/discover` find its servers; `bernie attach` (or the
+Attach button of the Dashboard) adds one as a run of §8.4.
+
+- **Processes.** Every `<root>/proc/*/cmdline` of `vllm serve MODEL`,
+  `python -m vllm.entrypoints.openai.api_server` or `python -m
+  vllm.entrypoints.cli.main serve`. The port is `--port` (default 8000); the
+  model is `--served-model-name`, else `--model`, else the argument after
+  `serve`.
+- **Containers.** `docker ps` and `podman ps`, five seconds each: a
+  container whose image or command names vLLM. A published port maps to the
+  host port; a container on the host network listens on the port of its
+  command. A container's server is listed once, as the container.
+- Every server is checked on `http://127.0.0.1:PORT/health`. A server that a
+  run already records names that run.
+- The scan only reads: it starts, stops and records nothing.
+
+`GET /api/discover` answers `{"servers": [{"url", "port", "model", "source",
+"pid", "container", "healthy", "run"}]}`. `source` is `process`, `docker` or
+`podman`. The Dashboard scans when the "Use a server that is already
+running" panel opens and offers an Attach button for every healthy server
+that no run records. It names the run after the container, else the last
+part of the model.
+
 ## 9. Tuning
 
 ### 9.1 TunableOp
@@ -2122,6 +2149,7 @@ The sparklines of the last minute keep every sample.
 | GET | `/api/runs` | `ps` JSON. An exited run has `findings` ([§8.3](#83-run-record)); the Logs tab shows them next to its log. A live run has `phase` ([§5.4](#54-log-phase)); the Logs tab shows the sentence under its state badge. |
 | POST | `/api/runs` | `{"recipe": "", "set": ["K=V"], "mode": "", "name": ""}` → run record. A name that is already running answers 409 Conflict. |
 | DELETE | `/api/runs/{name}` | stop (an attached run is only forgotten) |
+| GET | `/api/discover` | the vLLM servers of this host ([§8.5](#85-servers-found-on-this-host)). Read-only. |
 | POST | `/api/attach` | `{"url", "name", "recipe"}` → `{"run", "note"}`: attach a running server ([§8.4](#84-attached-servers)). An empty url answers 400; a server that fails a check answers 502 with the reason. |
 | GET | `/api/runs/{name}/logs?tail=N` | Server-sent events, one line per event (`tail` default 200). Ends with an `end` or `error` event. |
 | GET | `/api/runs/{name}/log?tail=2000&level=all&info&warn&error&q=text` | the tail of the log of a run: `{name, state, total_lines, truncated, lines: [{no, level, text}]}`. Every line carries its number in the log and its level. `level` is `all` (the default), `info`, `warn` or `error`; `q` is a case-insensitive substring; `tail` is 2000 lines by default. The levels are the rules of the log doctor: a line with `ERROR`, `Traceback`, `RuntimeError`, `CUDA error` or `Error:` is an error, a line with `WARNING` or `WARN` is a warning, every other line is info. A line that a finding points at is an error. |

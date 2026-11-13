@@ -43,6 +43,7 @@ const TAB_SCRIPTS = {
     "views/dashboard/dashboard.js",
     "views/dashboard/details.js",
     "views/dashboard/gpus.js",
+    "views/dashboard/attach.js",
     "views/dashboard/simple.js",
   ],
   benchmark: [

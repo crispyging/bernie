@@ -48,3 +48,15 @@ func (h *handler) postAttach(w http.ResponseWriter, r *http.Request) {
 	}
 	httpjson.Write(w, http.StatusCreated, res)
 }
+
+// GET /api/discover — the vLLM servers that run on this host, processes and
+// containers, each with its health and the run that records it (spec
+// §8.5). It only reads.
+func (h *handler) getDiscover(w http.ResponseWriter, r *http.Request) {
+	found, err := app.Discover(r.Context())
+	if err != nil {
+		httpjson.Error(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	httpjson.Write(w, http.StatusOK, map[string]any{"servers": found})
+}

@@ -14,28 +14,7 @@ function dashSimpleHero() {
   const chat = h("a.btn.primary", { href: "#chat" }, "Test in Chat");
   const connect = h("a.btn", { href: "#dashboard/connect" }, "Connect an app");
   const logs = h("a.btn", { href: "#logs" }, "Open Logs");
-  const attachURL = h("input", { inputmode: "url", placeholder: "http://chardis:8000", "aria-label": "Address of the running vLLM server" });
-  const attachBtn = h("button", { type: "submit" }, "Attach");
-  const attachForm = h("form.dash-attach-form", attachURL, attachBtn);
-  const attach = h("details.dash-attach", h("summary", "Use a server that is already running"), attachForm);
-  // An attached server is named after its host: chardis for http://chardis:8000.
-  const attachName = (raw) => {
-    let host = "";
-    try { host = new URL(raw.includes("://") ? raw : "http://" + raw).hostname; } catch (e) { /* the server checks the address */ }
-    const name = /^\d+$/.test(raw.trim()) ? "" : host.toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^[^a-z0-9]+/, "");
-    return !name || /^(127\.|localhost$)/.test(name) ? "attached" : name;
-  };
-  attachForm.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    attachBtn.disabled = true;
-    try {
-      const res = await api("/api/attach", { method: "POST", body: { url: attachURL.value.trim(), name: attachName(attachURL.value) } });
-      toast(res.note, true);
-      attachURL.value = "";
-      attach.open = false;
-      await dashLoad();
-    } catch (err) { toast("Attach failed: " + (err.message || err)); } finally { attachBtn.disabled = false; }
-  });
+  const attach = dashAttachPanel();
   const pick = h("select.dash-pick", { "aria-label": "The server the dashboard shows" });
   let pickKey = "";
   pick.addEventListener("change", () => {
@@ -110,7 +89,8 @@ function dashSimpleHero() {
       stop.hidden = !status.active;
       stop.textContent = run && run.foreign ? "Detach server" : "Stop server";
       stop.title = status.active ? (run.foreign ? "Forget attached server " : "Stop ") + run.name : "";
-      start.hidden = attach.hidden = status.active || status.unknown;
+      start.hidden = status.active || status.unknown;
+      attach.hidden = status.unknown;
       chat.hidden = !status.ready;
       connect.hidden = !status.active;
       logs.hidden = !run && !status.unknown;
