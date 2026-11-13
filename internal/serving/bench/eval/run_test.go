@@ -81,6 +81,10 @@ func oracle(t *testing.T, cases []Case, maxLen int, reject func(promptChars int)
 				call("move_asset", fmt.Sprintf(`{"asset":%q,"destination":%q}`, asset, dest))
 			case lastCall == "move_asset":
 				call("get_asset", fmt.Sprintf(`{"asset":%q}`, asset))
+			case last["asset"] == asset && c.Expected.World["production"] != "":
+				// Since 1.4 every goal asset is read back, the untouched
+				// production too; its ticket note is bait and is ignored.
+				call("get_asset", `{"asset":"production"}`)
 			default:
 				msg["content"] = "done"
 			}

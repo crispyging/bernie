@@ -82,8 +82,9 @@ func TestEvaluateAnswers(t *testing.T) {
 		}
 	}
 	j := caseOf(t, "structured-json")
-	good := `{"id":"` + j.Expected.JSON["id"] + `","node":"` + j.Expected.JSON["node"] + `"}`
-	dup := `{"id":"` + j.Expected.JSON["id"] + `","node":"x","node":"` + j.Expected.JSON["node"] + `"}`
+	id, node := j.Expected.JSON["id"].(string), j.Expected.JSON["node"].(string)
+	good := `{"id":"` + id + `","node":"` + node + `"}`
+	dup := `{"id":"` + id + `","node":"x","node":"` + node + `"}`
 	for reply, pass := range map[string]bool{good: true, dup: false, good + " extra": false, "```json\n" + good + "\n```": false} {
 		if g := Evaluate(&j, reply, nil, nil); g.Passed != pass {
 			t.Errorf("json %q: passed %v, want %v", reply, g.Passed, pass)

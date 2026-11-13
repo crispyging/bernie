@@ -3,7 +3,9 @@ package eval
 import (
 	"context"
 	"encoding/json"
+	"math"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/opengfx1030/bernie/internal/serving/vllm"
@@ -220,4 +222,49 @@ func number(v any) *float64 {
 		}
 	}
 	return nil
+}
+
+// AgentEfficiency sums the tool-call efficiency of the agent cases of a
+// model, the port of BroodBench's report_aggregation.agent_efficiency. It
+// never changes a verdict: Ratio is the fewest calls the cases needed over
+// the calls they used, 1 for the leanest trace.
+type AgentEfficiency struct {
+	Cases           int      `json:"cases"`
+	ToolCalls       int      `json:"tool_calls"`
+	MinToolCalls    int      `json:"min_tool_calls"`
+	ExcessCalls     int      `json:"excess_calls"`
+	FailedToolCalls int      `json:"failed_tool_calls"`
+	BudgetExhausted int      `json:"budget_exhausted"`
+	MeanToolCalls   float64  `json:"mean_tool_calls"`
+	Ratio           *float64 `json:"ratio"`
+}
+
+// agentEfficiency sums the efficiency details of the agent cases; it is nil
+// when no case recorded one.
+func agentEfficiency(cases []CaseResult) *AgentEfficiency {
+	var a AgentEfficiency
+	for _, c := range cases {
+		eff, ok := c.Details["efficiency"].(map[string]any)
+		if !ok {
+			continue
+		}
+		a.Cases++
+		used, _ := intOf(eff["tool_calls"])
+		least, _ := intOf(eff["min_tool_calls"])
+		excess, _ := intOf(eff["excess_calls"])
+		failed, _ := intOf(eff["failed_tool_calls"])
+		a.ToolCalls, a.MinToolCalls, a.ExcessCalls, a.FailedToolCalls = a.ToolCalls+used, a.MinToolCalls+least, a.ExcessCalls+excess, a.FailedToolCalls+failed
+		if c.Error == errStepLimit.Error() || strings.Contains(c.Error, "tool action limit reached") {
+			a.BudgetExhausted++
+		}
+	}
+	if a.Cases == 0 {
+		return nil
+	}
+	a.MeanToolCalls = float64(a.ToolCalls) / float64(a.Cases)
+	if a.ToolCalls > 0 {
+		r := math.Round(min(1, float64(a.MinToolCalls)/float64(a.ToolCalls))*1e4) / 1e4
+		a.Ratio = &r
+	}
+	return &a
 }

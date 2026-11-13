@@ -89,12 +89,24 @@ func Diagnose(r *CaseResult) *Diagnosis {
 		} else {
 			check("world_state", "unknown", expected, actual, "Expected or actual world evidence is absent.")
 		}
-		rbStatus := "unknown"
-		if haveRB {
-			rbStatus = map[bool]string{true: "pass", false: "fail"}[readbacks > 0]
+		required, verified := r.Details["required_goal_assets"], r.Details["verified_goal_assets"]
+		if req, ok := listOf(required); ok {
+			ver, _ := listOf(verified)
+			haveRB, readbacks = true, map[bool]int{true: 1, false: 0}[len(ver) == len(req)]
+			check("post_write_readback", map[bool]string{true: "pass", false: "fail"}[readbacks == 1], required, verified,
+				"Every goal asset must be read back at its target after its last write.")
+		} else {
+			rbStatus := "unknown"
+			if haveRB {
+				rbStatus = map[bool]string{true: "pass", false: "fail"}[readbacks > 0]
+			}
+			check("post_write_readback", rbStatus, "at least one matching post-write readback", r.Details["readback_count"],
+				"A write counts as checked when a later get_asset reads the same asset at the same location.")
 		}
-		check("post_write_readback", rbStatus, "at least one matching post-write readback", r.Details["readback_count"],
-			"A write counts as checked when a later get_asset reads the same asset at the same location.")
+		if eff, ok := r.Details["efficiency"].(map[string]any); ok {
+			check("tool_efficiency", "info", eff["min_tool_calls"], eff["tool_calls"], fmt.Sprintf("Used %v tool calls against a minimum of %v (%v failed). Reported apart; it does not change the verdict.",
+				eff["tool_calls"], eff["min_tool_calls"], eff["failed_tool_calls"]))
+		}
 		switch {
 		case passed:
 			set("passed", "Case passed", "The stored grader verdict is pass.")
@@ -115,7 +127,7 @@ func Diagnose(r *CaseResult) *Diagnosis {
 		case err != nil:
 			check("json", "fail", r.Expected.JSON, r.Reply, "The reply is not valid JSON or repeats a key.")
 			set("invalid_json", "Invalid JSON", "The reply could not be parsed as strict JSON.")
-		case reflect.DeepEqual(got, stringMap(r.Expected.JSON)):
+		case reflect.DeepEqual(got, normJSON(r.Expected.JSON)):
 			check("json", "pass", r.Expected.JSON, got, "Compared the parsed JSON objects exactly.")
 			if passed {
 				set("passed", "Case passed", "The stored grader verdict is pass.")
@@ -251,4 +263,19 @@ func intOf(v any) (int, bool) {
 		return int(n), true
 	}
 	return 0, false
+}
+
+// listOf reads a list of names: []string in memory, []any once read back.
+func listOf(v any) ([]string, bool) {
+	switch l := v.(type) {
+	case []string:
+		return l, true
+	case []any:
+		out := make([]string, 0, len(l))
+		for _, x := range l {
+			out = append(out, fmt.Sprint(x))
+		}
+		return out, true
+	}
+	return nil, false
 }
