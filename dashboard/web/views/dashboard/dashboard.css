@@ -29,7 +29,7 @@
 .dash-hero-num { font: 900 var(--hero-number)/1 var(--font-display); letter-spacing: -.03em; color: var(--key); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .dash-hero-unit { font: 700 15px var(--font-display); color: var(--muted); margin-left: 8px; }
 .dash-hero-note { font-size: 13px; color: var(--muted); margin-top: 6px; min-height: 18px; }
-.dash-hero-spark { margin-top: 10px; height: 44px; }
+.dash-hero-spark { margin-top: 10px; min-height: 44px; }
 .dash-tile { display: flex; flex-direction: column; }
 .dash-tile-spark { margin-top: auto; padding-top: 10px; }
 .dash-min0 { min-width: 0; }

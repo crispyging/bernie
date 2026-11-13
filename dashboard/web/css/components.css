@@ -282,6 +282,7 @@ tr.click:hover td { background: var(--surface-2); }
 
 /* the table under a chart: closed by default, opened by the reader */
 .chart-data { margin-top: 6px; }
+.chart-data[open] { max-height: 18rem; overflow-y: auto; }
 
 .chart-data-summary {
   cursor: pointer;
