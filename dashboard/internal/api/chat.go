@@ -33,6 +33,9 @@ var errChatTooLong = errors.New("the answer is longer than the limit")
 // chatRequest is the body of POST /api/chat: the prompt to send.
 type chatRequest struct {
 	Prompt string `json:"prompt"`
+	// Run names the server the dashboard shows; empty or gone means the
+	// first server that serves.
+	Run string `json:"run"`
 }
 
 // POST /api/chat — one prompt to the run that is serving, and the answer as
@@ -63,7 +66,7 @@ func (h *handler) postChat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer chatBusy.Store(false)
-	target, err := app.ChatTarget(r.Context())
+	target, err := app.ChatTarget(r.Context(), req.Run)
 	if err != nil {
 		chatError(w, err)
 		return

@@ -48,7 +48,7 @@ async function viewChat(root) {
     controller = new AbortController();
     const response = await fetch("/api/chat", {
       method: "POST", headers: { "Content-Type": "application/json", "X-Bernie": "1" },
-      credentials: "same-origin", body: JSON.stringify({ prompt: text }), signal: controller.signal,
+      credentials: "same-origin", body: JSON.stringify({ prompt: text, run: chatState.run || "" }), signal: controller.signal,
     });
     if (!response.ok) {
       let msg = response.status + " " + response.statusText;
@@ -140,7 +140,11 @@ async function viewChat(root) {
     try {
       const runs = runsOf(await api("/api/runs"));
       const active = runs.filter((r) => r.state !== "exited");
-      const live = active[0]; // Matches ChatTarget: oldest non-exited run, not first ready run.
+      // Matches ChatTarget: the server picked on the Dashboard, else the oldest active one.
+      let picked = "";
+      try { picked = localStorage.getItem("bernie.server") || ""; } catch (e) { /* the oldest one */ }
+      const live = active.find((r) => r.name === picked) || active[0];
+      chatState.run = live ? live.name : "";
       if (!live) {
         setHead(head, "Start a model to chat", "No model server is active on this host.");
         put(modelLine, emptyState("No model is available yet.", h("a", { href: "#setup" }, "Start a model in Setup"), "bernie serve <recipe>"));
@@ -155,14 +159,14 @@ async function viewChat(root) {
       if (ready) {
         try {
           const mod = await api("/api/models");
-          if (mod && Array.isArray(mod.running)) reported = mod.running[0] || "";
+          if (mod && Array.isArray(mod.running) && live === active[0]) reported = mod.running[0] || "";
           modelError = mod && mod.live_error || "";
         } catch (e) { modelError = e.message || String(e); }
       }
       const plan = live.plan || {};
-      const model = reported || plan.served_name || plan.model || live.recipe || live.name;
+      const model = reported || plan.served_name || plan.model || live.model || live.recipe || live.name;
       put(modelLine, h("b", (reported ? "Model: " : "Configured model: ") + model), " · Server: " + live.name,
-        active.length > 1 ? h("p.small.muted", active.length + " servers are active. Chat automatically uses the oldest active server at send time, even if another is ready. To use another server, connect an app to its API URL.") : null,
+        active.length > 1 ? h("p.small.muted", active.length + " servers are active. Chat uses " + live.name + ", the server picked on the Dashboard.") : null,
         modelError ? h("p.small", "The model list could not be read: " + modelError + ". A prompt will test whether this server can answer.") : null);
       setHead(head, ready ? "Ready for a test prompt" : failed ? "The server reported a failure"
         : unresponsive ? "The server is not responding" : "The model is still starting",

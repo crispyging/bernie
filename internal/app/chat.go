@@ -27,9 +27,15 @@ type ChatOptions struct {
 }
 
 // ChatTarget returns the URL of the run a chat request talks to: the run
-// that is serving. It fails with onboarding.ErrNoLiveRun when nothing
-// serves.
-func ChatTarget(ctx context.Context) (string, error) {
+// named name when it serves (the server the dashboard shows), else the
+// first run that serves. It fails with onboarding.ErrNoLiveRun when
+// nothing serves.
+func ChatTarget(ctx context.Context, name string) (string, error) {
+	if name != "" {
+		if run, err := onboarding.RunByName(ctx, name); err == nil {
+			return run.URL, nil
+		}
+	}
 	run, err := onboarding.LiveRun(ctx)
 	if err != nil {
 		return "", err

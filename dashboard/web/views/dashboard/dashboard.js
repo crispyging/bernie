@@ -13,6 +13,8 @@ const dash = {
   tele: null,    // the last telemetry document
   live: {},      // the parts the stream repaints
   subscribed: false, // the repaint of this tab is registered on the stream
+  // the server the page shows when several serve, kept per browser
+  pick: (() => { try { return localStorage.getItem("bernie.server") || ""; } catch (e) { return ""; } })(),
   // seconds per point of the window charts (1 = every sample), kept per browser
   group: (() => { try { return Number(localStorage.getItem("bernie.chart-group")) || 1; } catch (e) { return 1; } })(),
 };
@@ -46,62 +48,67 @@ function dashPush(doc) {
   dash.tele = doc;
   const gpus = doc.gpus || [];
   const runs = doc.runs || [];
-  const current = dashLiveRun();
-  const live = current && current.state !== "exited" ? runs.find((r) => r.name === current.name && r.state !== "exited") : null;
   const cards = gpus.map((g) => ({
     hip: g.hip_index, busy: g.busy_pct, pow: g.power_w, mem: g.vram_used,
     pci: (((dash.hw && dash.hw.gpus) || []).find((hw) => hw.hip_index === g.hip_index) || {}).pci || "",
     tmp: g.temp_c, cap: g.power_cap_w, total: g.vram_total,
   }));
-  const stats = live && live.state === "running" ? live.stats : null;
   let gen = 0, prompt = 0, known = runs.length > 0;
+  // Every live server keeps its own numbers, so the picker shows the
+  // history of the server it switches to.
+  const aggs = {};
   for (const run of runs) {
-    if (!run.stats) { known = false; break; }
+    if (!run.stats) known = false;
     gen += run.gen_tok_s || 0;
     prompt += run.prompt_tok_s || 0;
+    if (run.state === "running" && run.stats) aggs[run.name] = dashAgg(run);
   }
   dash.samples.push({
-    t: doc.time || Date.now(), run: live ? live.name : null, cards: cards,
+    t: doc.time || Date.now(), aggs: aggs, cards: cards,
     fleet: { gen: known ? gen : null, prompt: known ? prompt : null },
-    agg: {
-      gen: stats ? live.gen_tok_s : null,
-      prompt: stats ? live.prompt_tok_s : null,
-      running: stats ? stats.requests_running : null,
-      waiting: stats ? stats.requests_waiting : null,
-      kv: stats ? stats.kv_cache_usage : null,
-      spec: stats && stats.spec_draft_tokens_total > 0 ? stats.spec_accept_rate * 100 : null,
-      statsKnown: !!stats,
-      specOn: stats ? !!stats.speculation : null,
-      prefixKnown: stats ? !!stats.prefix_cache : null,
-      ttft: stats && stats.ttft ? stats.ttft.p50 : null,
-      ttftP95: stats && stats.ttft ? stats.ttft.p95 : null,
-      prefix: stats && stats.prefix_cache && stats.prefix_cache_queries_total > 0
-        ? stats.prefix_cache_hit_rate * 100 : null,
-      prefixCached: stats ? stats.prompt_tokens_cached_total : null,
-      prefixQueried: stats ? stats.prompt_tokens_total : null,
-    },
   });
   if (dash.samples.length > 3600) dash.samples.shift();
 }
 
-function dashSeries(key, count) {
-  const run = dashLiveRun();
-  return dash.samples.slice(-(count || 60)).map((s) =>
-    run && run.state !== "exited" && s.run === run.name && s.agg ? s.agg[key] : null);
+/** dashAgg is the sample of one running server. */
+function dashAgg(live) {
+  const stats = live.stats;
+  return {
+    gen: live.gen_tok_s, prompt: live.prompt_tok_s,
+    running: stats.requests_running, waiting: stats.requests_waiting, kv: stats.kv_cache_usage,
+    spec: stats.spec_draft_tokens_total > 0 ? stats.spec_accept_rate * 100 : null,
+    statsKnown: true, specOn: !!stats.speculation, prefixKnown: !!stats.prefix_cache,
+    ttft: stats.ttft ? stats.ttft.p50 : null, ttftP95: stats.ttft ? stats.ttft.p95 : null,
+    prefix: stats.prefix_cache && stats.prefix_cache_queries_total > 0 ? stats.prefix_cache_hit_rate * 100 : null,
+    prefixCached: stats.prompt_tokens_cached_total, prefixQueried: stats.prompt_tokens_total,
+  };
 }
 
+function dashSeries(key, count) {
+  const run = dashLiveRun();
+  return dash.samples.slice(-(count || 60)).map((s) => {
+    const agg = run && run.state !== "exited" && s.aggs && s.aggs[run.name];
+    return agg ? agg[key] : null;
+  });
+}
 
+/** dashPickRun shows the server with this name and keeps the choice. */
+function dashPickRun(name) {
+  dash.pick = name;
+  try { localStorage.setItem("bernie.server", name); } catch (e) { /* the page still works */ }
+}
 
 function dashLiveRun() {
   const runs = runsOf(state.runs);
   const latest = state.tele || dash.tele;
   if (latest && Array.isArray(latest.runs) && !(latest.time && Date.now() - latest.time > STALE_MS)) {
-    const live = latest.runs.find((r) => r.state !== "exited");
+    const up = latest.runs.filter((r) => r.state !== "exited");
+    const live = up.find((r) => r.name === dash.pick) || up[0];
     if (live) return Object.assign({}, runs.find((r) => r.name === live.name), live);
     const last = runs[runs.length - 1];
     return last ? Object.assign({}, last, { state: "exited" }) : null;
   }
-  return runs.find((r) => r.state !== "exited") || runs[runs.length - 1] || null;
+  return runs.find((r) => r.state !== "exited" && r.name === dash.pick) || runs.find((r) => r.state !== "exited") || runs[runs.length - 1] || null;
 }
 
 // Health and metrics are independent: missing /metrics does not mean loading.

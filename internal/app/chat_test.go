@@ -47,3 +47,21 @@ func TestChatRefusesARunThatIsNotReady(t *testing.T) {
 		t.Error("an empty prompt was sent")
 	}
 }
+
+// The dashboard names the server it shows: chat talks to that one, and to
+// the first server that serves when the name is empty or gone.
+func TestChatTargetFollowsThePickedServer(t *testing.T) {
+	t.Setenv("BERNIE_STATE_DIR", t.TempDir())
+	first := attachFake(t, "first", "m1")
+	second := attachFake(t, "second", "m2")
+	ctx := context.Background()
+	for name, want := range map[string]string{"second": second, "": first, "gone": first} {
+		got, err := ChatTarget(ctx, name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if strings.TrimSuffix(got, "/") != strings.TrimSuffix(want, "/") {
+			t.Errorf("ChatTarget(%q) = %s, want %s", name, got, want)
+		}
+	}
+}
