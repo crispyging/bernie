@@ -113,8 +113,12 @@ func startJob(ctx context.Context, step string, action *Action) (*Job, error) {
 	jobCancelMu.Lock()
 	jobCancels[id] = cancel
 	jobCancelMu.Unlock()
+	// The caller gets a copy: the job goroutine keeps writing to its own
+	// record while the caller encodes the answer. Later states are read
+	// from disk (GetJob).
+	started := *job
 	go runJob(runCtx, job, action, logf)
-	return job, nil
+	return &started, nil
 }
 
 // CancelJob stops the job with this id. It reports whether a running job of
