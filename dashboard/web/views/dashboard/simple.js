@@ -258,13 +258,23 @@ function dashSimpleCharts(section) {
   const output = areaChart([], { title: "All servers · output tokens/s · last 5 min", unit: "tok/s", hint: hint, windowMinutes: 5 });
   const prompt = areaChart([], { title: "All servers · input tokens/s · last 5 min", unit: "tok/s", hint: hint, windowMinutes: 5 });
   grid.append(output, prompt);
-  section.append(grid);
-  return {
-    update: () => {
-      output.update(dashWindowSeries("gen", null, "5m"), 5);
-      prompt.update(dashWindowSeries("prompt", null, "5m"), 5);
-    },
+  const seg = h("div.segmented-control", { role: "group", "aria-label": "Seconds per point of the charts" });
+  const paint = () => {
+    output.update(dashWindowSeries("gen", null, "5m"), 5);
+    prompt.update(dashWindowSeries("prompt", null, "5m"), 5);
   };
+  for (const g of [1, 5, 10, 15]) {
+    const button = h("button", { type: "button", "aria-pressed": String(g === dash.group) }, g + " s");
+    button.addEventListener("click", () => {
+      dash.group = g;
+      try { localStorage.setItem("bernie.chart-group", String(g)); } catch (e) { /* the page still works */ }
+      for (const b of seg.children) b.setAttribute("aria-pressed", String(b === button));
+      paint();
+    });
+    seg.append(button);
+  }
+  section.append(h("div.dash-group", h("span.small.muted", "One point per"), seg), grid);
+  return { update: paint };
 }
 
 function dashSimpleMachine(section) {

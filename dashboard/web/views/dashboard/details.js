@@ -83,7 +83,7 @@ function dashDetailsWindow() {
       mean.push(values.length ? values.reduce((a, b) => a + b, 0) / values.length : null);
     }
     const minutes = dashWindowMinutes(win);
-    chart.update(mean, minutes);
+    chart.update(dashGroup(mean, doc && doc.interval_s), minutes);
     put(note, mean.some((v) => v != null)
       ? "Last " + ((doc && doc.window) || win) + ", sampled every " + ((doc && doc.interval_s) || "–") + " s. Average activity across GPUs."
       : "No GPU activity readings are available for this window. Check Setup if no GPU is visible.");

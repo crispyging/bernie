@@ -25,6 +25,7 @@
   margin-bottom: 12px;
 }
 
+.dash-group { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
 .dash-attach { margin-top: 12px; }
 .dash-attach-form { display: flex; gap: 8px; margin-top: 8px; }
 .dash-attach-form input { flex: 1; min-width: 0; }

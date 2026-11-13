@@ -2033,6 +2033,11 @@ read-out of every card and the raw documents of `/api/telemetry`,
 `/api/hw`, `/api/runs` and `/api/gpus/history`. The history of the cards
 (`/api/gpus/history`) is read by the Dashboard tab. A number this host does
 not measure is shown as a dash with the words "n/a on this host".
+The history charts of the Dashboard tab have a `One point per` control:
+`1 s`, `5 s`, `10 s` or `15 s`. A choice above the spacing of the samples
+averages the samples of each bucket into one point, the newest bucket
+last; a bucket without a reading stays a gap. The browser keeps the choice.
+The sparklines of the last minute keep every sample.
 
 | Method | Path | Body / output |
 |---|---|---|
