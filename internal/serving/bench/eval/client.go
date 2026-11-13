@@ -79,34 +79,29 @@ type assistant struct {
 	ToolCalls []toolCall `json:"tool_calls,omitempty"`
 }
 
-type usageDoc struct {
-	PromptTokens     int `json:"prompt_tokens"`
-	CompletionTokens int `json:"completion_tokens"`
-}
-
-// chat sends one chat completion and returns the message of the model.
-func (c *client) chat(ctx context.Context, model string, msgs []any, tools []Tool, o Options) (assistant, *usageDoc, error) {
+// chat sends one chat completion and returns the message of the model and
+// the telemetry of the request.
+func (c *client) chat(ctx context.Context, model string, msgs []any, tools []Tool, o Options) (assistant, Call, error) {
 	ctx, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
 	req := map[string]any{"model": model, "messages": msgs, "temperature": o.Temperature, "max_tokens": o.MaxTokens}
 	if len(tools) > 0 {
 		req["tools"], req["tool_choice"] = tools, "auto"
 	}
-	var doc struct {
-		Choices []struct {
-			Message assistant `json:"message"`
-		} `json:"choices"`
-		Usage *usageDoc `json:"usage"`
-	}
+	start := time.Now()
+	var doc chatAnswer
 	if err := c.do(ctx, http.MethodPost, "/chat/completions", req, &doc); err != nil {
-		return assistant{}, nil, err
+		return assistant{}, Call{LatencyS: time.Since(start).Seconds(), Error: err.Error()}, err
 	}
+	call := callOf(&doc, time.Since(start).Seconds())
 	if len(doc.Choices) == 0 {
-		return assistant{}, doc.Usage, fmt.Errorf("%w: the answer has no choice", errModelOutput)
+		err := fmt.Errorf("%w: the answer has no choice", errModelOutput)
+		call.Error = err.Error()
+		return assistant{}, call, err
 	}
 	m := doc.Choices[0].Message
 	m.Role = "assistant"
-	return m, doc.Usage, nil
+	return m, call, nil
 }
 
 // do sends one request. An answer that is not 2xx becomes an error that

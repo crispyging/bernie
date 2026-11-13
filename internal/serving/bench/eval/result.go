@@ -59,6 +59,8 @@ type ModelSummary struct {
 	// did not pass; FailureFamilies counts their scenario families.
 	FailureCategories map[string]int `json:"failure_categories"`
 	FailureFamilies   map[string]int `json:"failure_families"`
+	// Performance is the telemetry of every request of the model.
+	Performance *Performance `json:"performance"`
 }
 
 func newResult(o Options, base string) *Result {
@@ -86,6 +88,11 @@ func (r *Result) finish() {
 			}
 		}
 		s.FailureCategories, s.FailureFamilies = FailureCounts(mine)
+		var calls []Call
+		for _, c := range mine {
+			calls = append(calls, c.Calls...)
+		}
+		s.Performance = aggregate(calls)
 		tracks, sizes := map[string]*Bucket{}, map[string]*Bucket{}
 		tokens, tokensKnown, latency := 0, true, 0.0
 		for _, c := range r.Cases {

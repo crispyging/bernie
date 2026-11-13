@@ -142,6 +142,16 @@ func Diagnose(r *CaseResult) *Diagnosis {
 	if r.Loop {
 		check("loop_guard", "fail", false, true, "The grader marked the loop guard.")
 	}
+	for i, c := range r.Calls {
+		if !c.Truncated {
+			continue
+		}
+		check("truncated_response", "fail", false, true, fmt.Sprintf("Call %d ended with finish_reason %s.", i+1, c.FinishReason))
+		d.Limitations = append(d.Limitations, fmt.Sprintf("Call %d was truncated (finish_reason %s).", i+1, c.FinishReason))
+		if !passed {
+			set("truncated_response", "Truncated response", "A reply was cut short by the server; the outcome is uncertain. Raise --max-tokens to measure this case.")
+		}
+	}
 	if r.Critical {
 		check("critical_operation_guard", "fail", false, true, "The grader marked a critical operation.")
 	}

@@ -2042,6 +2042,21 @@ expected value, the tool events and the grader details. The full prompt is
 not saved: the seed, the suite and the context size give it back, less the
 distractor records `context_admission` says were removed.
 
+Every case keeps `calls`: the telemetry of each chat request, BroodBench's
+per-call record. A call has `latency_s`, `finish_reason`, `truncated`, the
+usage (`prompt_tokens`, `completion_tokens`, `cached_tokens` from
+`prompt_tokens_details`) and, when the server reports timings
+(`prompt_n`, `prompt_ms`, `predicted_n`, `predicted_ms` in `timings`,
+`timing` or the usage, as llama.cpp does), `evaluated_prompt_tokens`,
+`prefill_tok_s`, `prefill_s`, `decode_tok_s` and `decode_s` with
+`prefill_source` and `decode_source` `server_timings`. The requests are
+not streamed, so there is no time to first token, and a rate the server
+did not report is absent. A failed request keeps its `error`. The summary
+of a model has `performance`: `calls`, `truncated`, `mean_latency_s`, the
+measured prefill and decode calls, `prefill_tok_s` and `decode_tok_s` (the
+tokens of the measured calls over their seconds, not the mean of the
+rates), their seconds and their sources.
+
 Every case also has a `diagnosis`, BroodBench's explanation of the outcome
 from the recorded evidence only. It never changes the verdict. bernie
 derives it on every save and every read, so an older result has one too.
@@ -2059,10 +2074,11 @@ The categories: `passed`, `skipped`, `exact_match_failure`, `invalid_json`,
 `protected_operation_attempt`, `harness_or_validation_error` (the reply
 satisfies the check, but the case ended with an error), `request_timeout`,
 `request_error` (the server refused or failed the request), `step_limit`,
-`tool_action_limit`, `invalid_tool_call` and `unknown_failure`. A guard or
-a transport error replaces the category of the grader comparison. bernie
-does not record `finish_reason`, so it has no category for a truncated
-reply. The summary of a model counts the categories and the scenario
+`tool_action_limit`, `invalid_tool_call`, `truncated_response` (a reply
+ended with `finish_reason` `length`, `content_filter` or `error`; a passed
+case keeps `passed` and lists the truncation under `limitations`) and
+`unknown_failure`. A guard or a transport error replaces the category of
+the grader comparison. The summary of a model counts the categories and the scenario
 families of the cases that did not pass in `failure_categories` and
 `failure_families`, and the text output prints the title of the diagnosis
 next to every case that did not pass.

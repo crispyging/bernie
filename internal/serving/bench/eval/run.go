@@ -124,6 +124,8 @@ type CaseResult struct {
 	// Admission is how the case was fitted to the server. It is absent
 	// when the server has neither a tokenizer nor a reported limit.
 	Admission *Admission `json:"context_admission,omitempty"`
+	// Calls is the telemetry of every chat request of the case.
+	Calls []Call `json:"calls,omitempty"`
 	// Diagnosis explains the outcome from the recorded evidence.
 	Diagnosis *Diagnosis `json:"diagnosis,omitempty"`
 }
@@ -229,12 +231,10 @@ func runCase(ctx context.Context, cl *client, o Options, model string, rep int, 
 	if world != nil {
 		world = world.clone()
 	}
-	reply, events, usage, err := converse(ctx, cl, o, model, c, world)
+	reply, events, calls, err := converse(ctx, cl, o, model, c, world)
 	r.LatencyS = time.Since(start).Seconds()
-	r.Reply, r.Events = reply, events
-	if usage.seen {
-		r.PromptTokens, r.CompletionTokens = &usage.prompt, &usage.completion
-	}
+	r.Reply, r.Events, r.Calls = reply, events, calls
+	r.PromptTokens, r.CompletionTokens = usageOf(calls)
 	g := Evaluate(c, reply, events, world)
 	r.Critical, r.Loop, r.Details = g.Critical, g.Loop, g.Details
 	switch {
@@ -255,27 +255,35 @@ var (
 	errModelOutput = errors.New("invalid model output")
 )
 
-type usage struct {
-	seen               bool
-	prompt, completion int
+// usageOf sums the usage of the calls of a case. It is nil when a call
+// came without usage.
+func usageOf(calls []Call) (*int, *int) {
+	prompt, completion := 0, 0
+	for _, c := range calls {
+		if c.PromptTokens == nil || c.CompletionTokens == nil {
+			return nil, nil
+		}
+		prompt += *c.PromptTokens
+		completion += *c.CompletionTokens
+	}
+	if len(calls) == 0 {
+		return nil, nil
+	}
+	return &prompt, &completion
 }
 
 // converse sends the case and, for an agent case, runs the tool calls of
 // the model against the world until it answers without one.
-func converse(ctx context.Context, cl *client, o Options, model string, c *Case, w *World) (string, []Event, usage, error) {
-	var u usage
+func converse(ctx context.Context, cl *client, o Options, model string, c *Case, w *World) (string, []Event, []Call, error) {
+	var u []Call
 	var events []Event
 	msgs := make([]any, 0, len(c.Messages)+8)
 	for _, m := range c.Messages {
 		msgs = append(msgs, m)
 	}
 	for steps := 0; ; steps++ {
-		msg, use, err := cl.chat(ctx, model, msgs, c.Tools(), o)
-		if use != nil {
-			u.seen = true
-			u.prompt += use.PromptTokens
-			u.completion += use.CompletionTokens
-		}
+		msg, call, err := cl.chat(ctx, model, msgs, c.Tools(), o)
+		u = append(u, call)
 		if err != nil {
 			return "", events, u, err
 		}
